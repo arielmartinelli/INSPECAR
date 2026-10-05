@@ -36,11 +36,8 @@ export const CarDamageMap: FC<CarDamageMapProps> = ({
   const norm = bodyType.toLowerCase();
   const isPickup = norm.includes('pick') || norm.includes('caja');
   const isSedan = norm.includes('sedán') || norm.includes('baúl');
-  const isVan = norm.includes('furgón') || norm.includes('utilitario') || norm.includes('van') || norm.includes('trafic');
 
-  const vehicleKey = isVan
-    ? 'van'
-    : isPickup
+  const vehicleKey = isPickup
     ? 'pickup'
     : isSedan
     ? 'sedan'

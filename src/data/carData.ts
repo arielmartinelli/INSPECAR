@@ -1,7 +1,7 @@
 export interface CarDatabase {
   [brand: string]: {
     popularModels: string[];
-    types: ('Sedán' | 'Hatchback' | 'SUV' | 'Pick-up' | 'Furgón/Utilitario' | 'Coupé')[];
+    types: ('Sedán' | 'Hatchback' | 'SUV' | 'Pick-up' | 'Coupé')[];
   };
 }
 
@@ -25,10 +25,9 @@ export const POPULAR_VEHICLES: CarDatabase = {
       'Duna',
       'Idea',
       'Línea',
-      'Bravo',
-      'Ducato'
+      'Bravo'
     ],
-    types: ['Sedán', 'Hatchback', 'Pick-up', 'SUV', 'Furgón/Utilitario']
+    types: ['Sedán', 'Hatchback', 'Pick-up', 'SUV']
   },
   Volkswagen: {
     popularModels: [
@@ -103,7 +102,7 @@ export const POPULAR_VEHICLES: CarDatabase = {
       'Master',
       'Symbol'
     ],
-    types: ['Hatchback', 'Sedán', 'SUV', 'Pick-up', 'Furgón/Utilitario']
+    types: ['Hatchback', 'Sedán', 'SUV', 'Pick-up']
   },
   Peugeot: {
     popularModels: [
@@ -115,12 +114,10 @@ export const POPULAR_VEHICLES: CarDatabase = {
       '207 Compact',
       '308',
       '408',
-      'Partner',
-      'Expert',
       '307',
       '5008'
     ],
-    types: ['Hatchback', 'SUV', 'Sedán', 'Furgón/Utilitario']
+    types: ['Hatchback', 'SUV', 'Sedán']
   },
   Chevrolet: {
     popularModels: [
@@ -175,12 +172,10 @@ export const POPULAR_VEHICLES: CarDatabase = {
       'C3 Aircross',
       'C4 Cactus',
       'C4 Lounge',
-      'Berlingo',
       'C4',
-      'Xsara Picasso',
-      'Jumpy'
+      'Xsara Picasso'
     ],
-    types: ['Hatchback', 'SUV', 'Sedán', 'Furgón/Utilitario']
+    types: ['Hatchback', 'SUV', 'Sedán']
   },
   Jeep: {
     popularModels: [
@@ -201,8 +196,7 @@ export const POPULAR_VEHICLES: CarDatabase = {
       'i10',
       'Grand i10',
       'i30',
-      'Elantra',
-      'H1'
+      'Elantra'
     ],
     types: ['SUV', 'Hatchback', 'Sedán']
   },
@@ -258,11 +252,9 @@ export const POPULAR_VEHICLES: CarDatabase = {
       'Clase C',
       'Clase E',
       'GLA',
-      'GLC',
-      'Sprinter',
-      'Vito'
+      'GLC'
     ],
-    types: ['Sedán', 'Hatchback', 'SUV', 'Furgón/Utilitario']
+    types: ['Sedán', 'Hatchback', 'SUV']
   },
   Audi: {
     popularModels: [
@@ -283,8 +275,7 @@ export const VEHICLE_BODY_TYPES = [
   'Pick-up (Con caja)',
   'Sedán (Con baúl)',
   'Hatchback (Sin baúl)',
-  'SUV / Camioneta cerrada',
-  'Furgón / Utilitario'
+  'SUV / Camioneta cerrada'
 ];
 
 export const FUEL_TYPES = [
