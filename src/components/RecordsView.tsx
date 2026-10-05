@@ -74,6 +74,19 @@ export const RecordsView: FC<RecordsViewProps> = ({ currentId, refreshKey, busy,
     }
   };
 
+  const deleteRecord = async (r: RecordSummary) => {
+    const nombre = r.patente || r.vehiculo;
+    if (!window.confirm(`¿Borrar definitivamente la inspección ${nombre}${r.clienteNombre ? ` de ${r.clienteNombre}` : ''}?\n\nSe borran también sus notas de seguimiento. No se puede deshacer.`)) return;
+    try {
+      await repo.remove(r.id);
+      setRows((prev) => prev.filter((x) => x.id !== r.id));
+      setSelected((s) => (s?.id === r.id ? null : s));
+      onDeleted(r.id);
+    } catch {
+      window.alert('No se pudo borrar. Revisá la conexión.');
+    }
+  };
+
   return (
     <div className="space-y-4">
       <section className="bg-white border-2 border-slate-900 shadow-[4px_4px_0px_0px_rgba(15,23,42,1)] p-3 sm:p-5">
@@ -193,6 +206,15 @@ export const RecordsView: FC<RecordsViewProps> = ({ currentId, refreshKey, busy,
                       <button type="button" onClick={() => setSelected(r)} className="px-2 py-1.5 text-xs font-bold border-2 border-slate-300 hover:border-slate-900">
                         Seguimiento
                       </button>
+                      <button
+                        type="button"
+                        onClick={() => deleteRecord(r)}
+                        className="p-1.5 border-2 border-rose-200 text-rose-600 hover:border-rose-600 hover:bg-rose-50"
+                        aria-label={`Borrar inspección ${r.patente || r.vehiculo}`}
+                        title="Borrar inspección"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -222,7 +244,7 @@ export const RecordsView: FC<RecordsViewProps> = ({ currentId, refreshKey, busy,
               </div>
               <Score r={r} />
             </div>
-            <div className="grid grid-cols-3 gap-1.5 mt-3">
+            <div className="grid grid-cols-[1fr_1fr_1fr_auto] gap-1.5 mt-3">
               <button type="button" onClick={() => onOpen(r.id)} className="h-10 border-2 border-slate-900 bg-slate-900 text-white text-xs font-black uppercase flex items-center justify-center gap-1">
                 <FolderOpen className="w-4 h-4" aria-hidden /> Abrir
               </button>
@@ -231,6 +253,14 @@ export const RecordsView: FC<RecordsViewProps> = ({ currentId, refreshKey, busy,
               </button>
               <button type="button" onClick={() => setSelected(r)} className="h-10 border-2 border-slate-300 bg-white text-xs font-black uppercase">
                 Seguimiento
+              </button>
+              <button
+                type="button"
+                onClick={() => deleteRecord(r)}
+                className="h-10 w-10 border-2 border-rose-200 text-rose-600 bg-white grid place-items-center"
+                aria-label={`Borrar inspección ${r.patente || r.vehiculo}`}
+              >
+                <Trash2 className="w-4 h-4" />
               </button>
             </div>
           </article>
@@ -250,17 +280,7 @@ export const RecordsView: FC<RecordsViewProps> = ({ currentId, refreshKey, busy,
           record={selected}
           onClose={() => setSelected(null)}
           onEstado={(e) => changeEstado(selected, e)}
-          onDelete={async () => {
-            if (!window.confirm(`¿Borrar definitivamente la inspección ${selected.patente || selected.vehiculo}? No se puede deshacer.`)) return;
-            try {
-              await repo.remove(selected.id);
-              onDeleted(selected.id);
-              setSelected(null);
-              load(texto, estado);
-            } catch {
-              window.alert('No se pudo borrar. Revisá la conexión.');
-            }
-          }}
+          onDelete={() => deleteRecord(selected)}
         />
       )}
     </div>
