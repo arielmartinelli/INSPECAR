@@ -12,6 +12,8 @@ import { VehicleHeaderForm } from './components/VehicleHeaderForm';
 import { InspectionSection } from './components/InspectionSection';
 import { AccessoriesSection } from './components/AccessoriesSection';
 import { CarDamageMap } from './components/CarDamageMap';
+import { HistoryPanel } from './components/HistoryPanel';
+import { loadHistory, saveToHistory, deleteFromHistory, hasContent, type HistoryEntry } from './utils/history';
 import {
   FileDown,
   RotateCcw,
@@ -24,6 +26,8 @@ import {
   ChevronRight,
   ChevronLeft,
   Share2,
+  History,
+  Save,
   type LucideIcon
 } from 'lucide-react';
 import { VEHICLE_BODY_TYPES } from './data/carData';
@@ -163,17 +167,42 @@ export function App() {
     }));
   };
 
-  // jsPDF pesa ~400 KB: se descarga recién cuando se pide el PDF, así la app abre más rápido.
-  const buildPdf = async () => {
-    const { generateInspectionPDF } = await import('./utils/pdfGenerator');
-    return generateInspectionPDF(data);
+  // ── Historial ─────────────────────────────────────────────
+  const [history, setHistory] = useState<HistoryEntry[]>(loadHistory);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [savedFlash, setSavedFlash] = useState(false);
+
+  const archive = (d: InspectionData) => {
+    if (hasContent(d)) setHistory(saveToHistory(d));
   };
 
-  const handleDownloadPDF = async () => {
+  const handleSaveToHistory = () => {
+    archive(data);
+    setSavedFlash(true);
+    setTimeout(() => setSavedFlash(false), 2000);
+  };
+
+  const handleOpenFromHistory = (d: InspectionData) => {
+    archive(data); // la planilla actual no se pierde: queda guardada antes de abrir otra
+    setData(d);
+    setActiveTab('vehiculo');
+    setHistoryOpen(false);
+  };
+
+  const handleDeleteFromHistory = (id: string) => setHistory(deleteFromHistory(id));
+
+  // jsPDF pesa ~400 KB: se descarga recién cuando se pide el PDF, así la app abre más rápido.
+  const buildPdf = async (d: InspectionData = data) => {
+    const { generateInspectionPDF } = await import('./utils/pdfGenerator');
+    return generateInspectionPDF(d);
+  };
+
+  const handleDownloadPDF = async (d: InspectionData = data) => {
     setIsGeneratingPdf(true);
     try {
-      const doc = await buildPdf();
-      doc.save(buildFileName(data));
+      const doc = await buildPdf(d);
+      doc.save(buildFileName(d));
+      if (d.id === data.id) archive(d); // cada informe generado queda en el historial
     } catch (error) {
       console.error('Error generating PDF:', error);
       alert('Hubo un error al generar el PDF. Verificá los datos.');
@@ -187,6 +216,7 @@ export function App() {
     setIsGeneratingPdf(true);
     try {
       const doc = await buildPdf();
+      archive(data);
       const file = new File([doc.output('blob')], buildFileName(data), { type: 'application/pdf' });
       await navigator.share({ files: [file], title: 'Informe INSPECAR' });
     } catch (error) {
@@ -197,7 +227,12 @@ export function App() {
   };
 
   const handleReset = () => {
-    if (window.confirm('¿Deseas reiniciar la planilla para un nuevo vehículo? Se borrarán todos los datos cargados.')) {
+    const keep = hasContent(data);
+    const msg = keep
+      ? '¿Empezar una nueva inspección? La actual queda guardada en el Historial.'
+      : '¿Empezar una nueva inspección?';
+    if (window.confirm(msg)) {
+      archive(data);
       const fresh = getInitialData();
       try {
         localStorage.removeItem(STORAGE_KEY);
@@ -255,6 +290,21 @@ export function App() {
           <div className="flex items-center gap-2">
             <button
               type="button"
+              onClick={() => setHistoryOpen(true)}
+              className="relative p-2 border-2 border-slate-300 text-slate-600 hover:border-slate-900 transition-colors"
+              title="Historial de inspecciones"
+              aria-label={`Historial de inspecciones (${history.length})`}
+            >
+              <History className="w-4 h-4" />
+              {history.length > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 min-w-4 h-4 px-1 bg-slate-900 text-white rounded-full text-[9px] font-bold flex items-center justify-center">
+                  {history.length}
+                </span>
+              )}
+            </button>
+
+            <button
+              type="button"
               onClick={handleReset}
               className="p-2 border-2 border-slate-300 text-slate-500 hover:text-rose-600 hover:border-slate-900 transition-colors"
               title="Reiniciar planilla"
@@ -265,7 +315,7 @@ export function App() {
 
             <button
               type="button"
-              onClick={handleDownloadPDF}
+              onClick={() => handleDownloadPDF()}
               disabled={isGeneratingPdf}
               className="flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 disabled:opacity-60 text-white font-black px-4 py-2.5 text-xs uppercase tracking-wider border-2 border-slate-900 shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] active:translate-x-0.5 active:translate-y-0.5 transition-all"
             >
@@ -463,6 +513,15 @@ export function App() {
               />
             </div>
 
+            <button
+              type="button"
+              onClick={handleSaveToHistory}
+              className="w-full h-12 border-2 border-slate-900 bg-white hover:bg-slate-50 text-slate-900 font-black text-sm uppercase flex items-center justify-center gap-2 shadow-[3px_3px_0px_0px_rgba(15,23,42,1)]"
+            >
+              <Save className="w-4 h-4" aria-hidden />
+              {savedFlash ? '✓ Guardada en el historial' : 'Guardar en historial'}
+            </button>
+
             {shareSupported && (
               <button
                 type="button"
@@ -515,7 +574,7 @@ export function App() {
           ) : (
             <button
               type="button"
-              onClick={handleDownloadPDF}
+              onClick={() => handleDownloadPDF()}
               disabled={isGeneratingPdf}
               className="h-11 px-4 border-2 border-slate-900 bg-slate-900 hover:bg-slate-800 text-white font-black text-xs uppercase font-mono flex items-center gap-1.5 active:scale-95 shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] transition-all shrink-0"
             >
@@ -525,6 +584,18 @@ export function App() {
           )}
         </div>
       </div>
+
+      {historyOpen && (
+        <HistoryPanel
+          entries={history}
+          currentId={data.id}
+          busy={isGeneratingPdf}
+          onClose={() => setHistoryOpen(false)}
+          onOpen={handleOpenFromHistory}
+          onDownload={(d) => handleDownloadPDF(d)}
+          onDelete={handleDeleteFromHistory}
+        />
+      )}
     </div>
   );
 }
