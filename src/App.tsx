@@ -171,17 +171,12 @@ export function App() {
       {/* Top Header Bar Sticky: Título INSPECAR + Botón PDF */}
       <header className="sticky top-0 z-40 bg-white border-b-2 border-slate-900 shadow-sm">
         <div className="max-w-3xl mx-auto px-3 sm:px-4 py-2.5 flex items-center justify-between">
-          <div className="flex items-center gap-2.5 sm:gap-3">
+          <div className="flex items-center">
             <img
               src="/logo.png"
-              alt="INSPECAR Logo"
-              className="h-8 sm:h-10 w-auto object-contain"
+              alt="INSPECAR"
+              className="h-7 sm:h-8 w-auto object-contain"
             />
-            {data.vehicle.dominio && (
-              <span className="hidden sm:inline-block bg-slate-100 border border-slate-900 px-2 py-0.5 text-[10px] font-mono font-black text-slate-800 tracking-wider">
-                {data.vehicle.dominio.toUpperCase()}
-              </span>
-            )}
           </div>
 
           {/* Top Actions: Reset + Botón PDF Directo */}

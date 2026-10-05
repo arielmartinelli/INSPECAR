@@ -227,9 +227,9 @@ export async function generateInspectionPDF(data: InspectionData): Promise<jsPDF
   doc.setLineWidth(0.8);
   doc.rect(14, 10, pageWidth - 28, 20);
 
-  // Logo Oficial INSPECAR en Header
+  // Logo Oficial INSPECAR en Header (Sin marco exterior)
   if (logoImgData) {
-    doc.addImage(logoImgData, 'JPEG', 15, 11, 54, 18);
+    doc.addImage(logoImgData, 'JPEG', 16, 13.5, 52, 12.5);
   } else {
     // Bloque Logo alternativo
     doc.setFillColor(15, 23, 42);
@@ -544,7 +544,7 @@ export async function generateInspectionPDF(data: InspectionData): Promise<jsPDF
   doc.rect(14, 10, pageWidth - 28, 15);
 
   if (logoImgData) {
-    doc.addImage(logoImgData, 'JPEG', 15, 10.5, 42, 14);
+    doc.addImage(logoImgData, 'JPEG', 16, 12.5, 40, 9.5);
   } else {
     doc.setFillColor(15, 23, 42);
     doc.rect(14, 10, 42, 15, 'F');
