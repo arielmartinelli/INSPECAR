@@ -35,13 +35,16 @@ export const CarDamageMap: FC<CarDamageMapProps> = ({
   // Normalizar tipo de carrocería
   const norm = bodyType.toLowerCase();
   const isPickup = norm.includes('pick') || norm.includes('caja');
-  const isSedan = norm.includes('sedán') || norm.includes('baúl');
+  const isHatchback = norm.includes('hatchback') || norm.includes('sin baúl') || norm.includes('sin baul');
+  const isSedan = !isHatchback && (norm.includes('sedán') || norm.includes('sedan') || norm.includes('baúl') || norm.includes('baul'));
 
   const vehicleKey = isPickup
     ? 'pickup'
+    : isHatchback
+    ? 'hatchback'
     : isSedan
     ? 'sedan'
-    : 'hatchback';
+    : 'sedan';
 
   const currentImageSrc = `/blueprints/crops/${vehicleKey}_${activeView}.jpg`;
 
@@ -116,8 +119,8 @@ export const CarDamageMap: FC<CarDamageMapProps> = ({
         </div>
       </div>
 
-      {/* SELECTOR DE LAS 5 VISTAS (Scroll horizontal en celular) */}
-      <div className="flex gap-1.5 overflow-x-auto pb-2 scrollbar-none mb-3">
+      {/* SELECTOR DE LAS 5 VISTAS */}
+      <div className="grid grid-cols-5 gap-1 sm:gap-1.5 mb-3">
         {views.map((v) => {
           const count = markers.filter((m) => m.view === v.id).length;
           const isActive = activeView === v.id;
@@ -126,16 +129,17 @@ export const CarDamageMap: FC<CarDamageMapProps> = ({
             <button
               key={v.id}
               type="button"
+              title={v.label}
               onClick={() => setActiveView(v.id)}
-              className={`flex-1 min-w-[100px] sm:min-w-0 py-2 px-2.5 border-2 text-xs font-mono font-bold uppercase tracking-wider whitespace-nowrap transition-all flex items-center justify-center gap-1.5 ${
+              className={`py-2 px-1 border-2 text-[10px] sm:text-xs font-mono font-bold uppercase tracking-tight whitespace-nowrap transition-all flex items-center justify-center gap-1 ${
                 isActive
                   ? 'bg-slate-900 border-slate-900 text-white shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] scale-[1.02]'
                   : 'bg-white border-slate-300 text-slate-700 hover:border-slate-900'
               }`}
             >
-              <span>{v.label}</span>
+              <span>{v.short}</span>
               {count > 0 && (
-                <span className="w-4 h-4 bg-rose-600 text-white rounded-full text-[10px] flex items-center justify-center font-bold">
+                <span className="w-3.5 h-3.5 sm:w-4 sm:h-4 bg-rose-600 text-white rounded-full text-[9px] sm:text-[10px] flex items-center justify-center font-bold">
                   {count}
                 </span>
               )}
@@ -210,12 +214,12 @@ export const CarDamageMap: FC<CarDamageMapProps> = ({
         {/* Blueprint CAD de alta definición para la vista actual */}
         <div
           onClick={handleImageClick}
-          className="relative w-full aspect-[16/10] sm:aspect-[16/9] bg-white border border-slate-300 overflow-hidden cursor-crosshair shadow-sm select-none flex items-center justify-center p-2"
+          className="relative w-full aspect-[16/9] bg-white border border-slate-300 overflow-hidden cursor-crosshair shadow-sm select-none flex items-center justify-center"
         >
           <img
             src={currentImageSrc}
             alt={currentViewObj.label}
-            className="max-w-full max-h-full object-contain pointer-events-none select-none"
+            className="w-full h-full object-contain pointer-events-none select-none"
             draggable={false}
           />
 

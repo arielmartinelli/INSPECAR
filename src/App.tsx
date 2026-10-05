@@ -109,10 +109,10 @@ export function App() {
     }));
   };
 
-  const handleDownloadPDF = () => {
+  const handleDownloadPDF = async () => {
     setIsGeneratingPdf(true);
     try {
-      const doc = generateInspectionPDF(data);
+      const doc = await generateInspectionPDF(data);
       const brand = data.vehicle.marca === 'OTRA' ? data.vehicle.marcaPersonalizada : data.vehicle.marca;
       const model = data.vehicle.modelo === 'OTRO' ? data.vehicle.modeloPersonalizado : data.vehicle.modelo;
       const filename = `INSPECAR-${(data.vehicle.dominio || 'AUTO').toUpperCase()}-${(brand || '')}-${(model || '')}.pdf`.replace(/\s+/g, '_');
