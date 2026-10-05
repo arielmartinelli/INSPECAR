@@ -34,14 +34,14 @@ const getInitialData = (): InspectionData => {
     id: 'INSP-' + Date.now().toString(36).toUpperCase(),
     createdAt: new Date().toISOString(),
     vehicle: {
-      tipoVehiculo: 'Pick-up (Con caja)',
-      marca: 'Fiat',
-      modelo: 'Toro Freedom',
-      version: '2.0 MultiJet 4x4 AT9',
-      anio: '2018',
-      dominio: 'AC 073 DR',
-      combustible: 'Diesel',
-      kilometros: '138600',
+      tipoVehiculo: 'Sedán (Con baúl)',
+      marca: '',
+      modelo: '',
+      version: '',
+      anio: '',
+      dominio: '',
+      combustible: 'Nafta',
+      kilometros: '',
       fecha: today,
       itvVtv: 'NO'
     },
@@ -50,9 +50,8 @@ const getInitialData = (): InspectionData => {
     mecanica: {},
     accesorios: {},
     damageMarkers: [],
-    observaciones:
-      'Cubiertas del 2021 al 40% | Frenos delanteros al 40% | Lona marítima en buen estado, faltan varillas | Pérdida de aceite por junta del depresor | Ópticas delanteras sucias | Tapones traseros rotos | Ópticas antinieblas con humedad | Respaldar asiento trasero no traba | Salidas de ventilación centrales rotas | Distribución y correa de accesorios desgastados | Admisión tapada de hollín.',
-    conclusionGeneral: 'Con reparaciones pendientes'
+    observaciones: '',
+    conclusionGeneral: 'A criterio del comprador'
   };
 };
 
@@ -126,19 +125,14 @@ export function App() {
   };
 
   const handleReset = () => {
-    if (window.confirm('¿Deseas reiniciar la planilla para un nuevo vehículo?')) {
+    if (window.confirm('¿Deseas reiniciar la planilla para un nuevo vehículo? Se borrarán todos los datos cargados.')) {
       const fresh = getInitialData();
-      fresh.vehicle.marca = 'Fiat';
-      fresh.vehicle.modelo = '';
-      fresh.vehicle.dominio = '';
-      fresh.vehicle.anio = '';
-      fresh.vehicle.kilometros = '';
-      fresh.observaciones = '';
-      fresh.interior = {};
-      fresh.exterior = {};
-      fresh.mecanica = {};
-      fresh.accesorios = {};
-      fresh.damageMarkers = [];
+      try {
+        localStorage.removeItem(STORAGE_KEY);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(fresh));
+      } catch (e) {
+        console.error(e);
+      }
       setData(fresh);
       setActiveTab('vehiculo');
     }

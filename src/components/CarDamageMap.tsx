@@ -35,11 +35,14 @@ export const CarDamageMap: FC<CarDamageMapProps> = ({
   // Normalizar tipo de carrocería
   const norm = bodyType.toLowerCase();
   const isPickup = norm.includes('pick') || norm.includes('caja');
-  const isHatchback = norm.includes('hatchback') || norm.includes('sin baúl') || norm.includes('sin baul');
-  const isSedan = !isHatchback && (norm.includes('sedán') || norm.includes('sedan') || norm.includes('baúl') || norm.includes('baul'));
+  const isSuv = norm.includes('suv') || norm.includes('camioneta') || norm.includes('cerrada') || norm.includes('crossover');
+  const isHatchback = !isSuv && (norm.includes('hatchback') || norm.includes('sin baúl') || norm.includes('sin baul'));
+  const isSedan = !isSuv && !isHatchback && (norm.includes('sedán') || norm.includes('sedan') || norm.includes('baúl') || norm.includes('baul'));
 
   const vehicleKey = isPickup
     ? 'pickup'
+    : isSuv
+    ? 'suv'
     : isHatchback
     ? 'hatchback'
     : isSedan
