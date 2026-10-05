@@ -310,35 +310,35 @@ export const VehicleHeaderForm: FC<VehicleHeaderFormProps> = ({ vehicle, onChang
           </select>
         </div>
 
-        {/* Fecha & ITV/VTV */}
-        <div className="grid grid-cols-2 gap-2">
-          <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
-              Fecha
-            </label>
-            <input
-              type="date"
-              value={vehicle.fecha}
-              onChange={(e) => onChange({ ...vehicle, fecha: e.target.value })}
-              className="w-full bg-slate-50 border-2 border-slate-900 rounded-none px-2.5 py-2.5 text-xs font-bold text-slate-900 focus:outline-none focus:bg-white transition-colors"
-            />
-          </div>
+        {/* Fecha */}
+        <div>
+          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5 flex items-center gap-1.5">
+            <Calendar className="w-3.5 h-3.5 text-slate-900" />
+            Fecha de Inspección
+          </label>
+          <input
+            type="date"
+            value={vehicle.fecha}
+            onChange={(e) => onChange({ ...vehicle, fecha: e.target.value })}
+            className="w-full bg-slate-50 border-2 border-slate-900 rounded-none px-3.5 py-2.5 text-sm font-bold text-slate-900 focus:outline-none focus:bg-white transition-colors"
+          />
+        </div>
 
-          <div>
-            <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5 flex items-center gap-1">
-              <ShieldCheck className="w-3.5 h-3.5 text-slate-900" />
-              ITV / VTV
-            </label>
-            <select
-              value={vehicle.itvVtv}
-              onChange={(e) => onChange({ ...vehicle, itvVtv: e.target.value as 'SI' | 'NO' | '' })}
-              className="w-full bg-slate-50 border-2 border-slate-900 rounded-none px-2.5 py-2.5 text-xs font-bold text-slate-900 focus:outline-none focus:bg-white transition-colors"
-            >
-              <option value="">Elegir</option>
-              <option value="SI">SÍ</option>
-              <option value="NO">NO</option>
-            </select>
-          </div>
+        {/* ITV / VTV */}
+        <div>
+          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5 flex items-center gap-1.5">
+            <ShieldCheck className="w-3.5 h-3.5 text-slate-900" />
+            ITV / VTV Vigente
+          </label>
+          <select
+            value={vehicle.itvVtv}
+            onChange={(e) => onChange({ ...vehicle, itvVtv: e.target.value as 'SI' | 'NO' | '' })}
+            className="w-full bg-slate-50 border-2 border-slate-900 rounded-none px-3.5 py-2.5 text-sm font-bold text-slate-900 focus:outline-none focus:bg-white transition-colors"
+          >
+            <option value="">-- Seleccionar Estado --</option>
+            <option value="SI">SÍ (Vigente)</option>
+            <option value="NO">NO (Vencida o Sin VTV)</option>
+          </select>
         </div>
       </div>
     </div>
