@@ -24,7 +24,10 @@ export const POPULAR_VEHICLES: CarDatabase = {
       'Duna',
       'Idea',
       'Línea',
-      'Bravo'
+      'Bravo',
+      'Fiorino',
+      'Ducato',
+      'Doblò'
     ],
     types: ['Sedán', 'Hatchback', 'Pick-up', 'SUV']
   },
@@ -46,7 +49,9 @@ export const POPULAR_VEHICLES: CarDatabase = {
       'Passat',
       'Saveiro',
       'Tiguan',
-      'Golf'
+      'Golf',
+      'Transporter',
+      'Scirocco'
     ],
     types: ['Hatchback', 'Sedán', 'Pick-up', 'SUV']
   },
@@ -59,7 +64,9 @@ export const POPULAR_VEHICLES: CarDatabase = {
       'Yaris',
       'SW4',
       'RAV4',
-      'Land Cruiser'
+      'Land Cruiser',
+      'Hiace',
+      'GR86'
     ],
     types: ['Pick-up', 'Sedán', 'Hatchback', 'SUV']
   },
@@ -77,7 +84,9 @@ export const POPULAR_VEHICLES: CarDatabase = {
       'Maverick',
       'Kuga',
       'F-100',
-      'Mondeo'
+      'Mondeo',
+      'Transit',
+      'Mustang'
     ],
     types: ['Pick-up', 'Hatchback', 'Sedán', 'SUV']
   },
@@ -95,7 +104,10 @@ export const POPULAR_VEHICLES: CarDatabase = {
       'Fluence',
       'Megane',
       'Captur',
-      'Symbol'
+      'Symbol',
+      'Kangoo',
+      'Master',
+      'Trafic'
     ],
     types: ['Hatchback', 'Sedán', 'SUV', 'Pick-up']
   },
@@ -110,7 +122,11 @@ export const POPULAR_VEHICLES: CarDatabase = {
       '308',
       '408',
       '307',
-      '5008'
+      '5008',
+      'Partner',
+      'Expert',
+      'Boxer',
+      'RCZ'
     ],
     types: ['Hatchback', 'SUV', 'Sedán']
   },
@@ -131,7 +147,8 @@ export const POPULAR_VEHICLES: CarDatabase = {
       'Sonic',
       'Trailblazer',
       'Captiva',
-      'Equinox'
+      'Equinox',
+      'Camaro'
     ],
     types: ['Hatchback', 'Sedán', 'SUV', 'Pick-up']
   },
@@ -168,7 +185,10 @@ export const POPULAR_VEHICLES: CarDatabase = {
       'C4 Cactus',
       'C4 Lounge',
       'C4',
-      'Xsara Picasso'
+      'Xsara Picasso',
+      'Berlingo',
+      'Jumpy',
+      'Jumper'
     ],
     types: ['Hatchback', 'SUV', 'Sedán']
   },
@@ -191,7 +211,8 @@ export const POPULAR_VEHICLES: CarDatabase = {
       'i10',
       'Grand i10',
       'i30',
-      'Elantra'
+      'Elantra',
+      'H1'
     ],
     types: ['SUV', 'Hatchback', 'Sedán']
   },
@@ -247,7 +268,9 @@ export const POPULAR_VEHICLES: CarDatabase = {
       'Clase C',
       'Clase E',
       'GLA',
-      'GLC'
+      'GLC',
+      'Sprinter',
+      'Vito'
     ],
     types: ['Sedán', 'Hatchback', 'SUV']
   },
@@ -270,19 +293,39 @@ export const VEHICLE_BODY_TYPES = [
   'Pick-up (Con caja)',
   'Sedán (Con baúl)',
   'Hatchback (Sin baúl)',
-  'SUV / Camioneta cerrada'
+  'SUV / Camioneta cerrada',
+  'Coupé (2 puertas)',
+  'Furgón / Utilitario'
 ];
 
-export type BlueprintKey = 'pickup' | 'sedan' | 'hatchback' | 'suv';
+export type BlueprintKey = 'pickup' | 'sedan' | 'hatchback' | 'suv' | 'furgon';
+export type BlueprintView = 'lateral_der' | 'lateral_izq' | 'frente' | 'trasera' | 'techo';
 
-/** Única fuente de verdad para elegir el plano según la carrocería (la usan la app y el PDF). */
+const ALL_VIEWS: BlueprintView[] = ['lateral_der', 'lateral_izq', 'frente', 'trasera', 'techo'];
+
+/** Vistas que tienen plano para cada carrocería (el furgón no tiene vista de techo). */
+export const BLUEPRINT_VIEWS: Record<BlueprintKey, BlueprintView[]> = {
+  pickup: ALL_VIEWS,
+  sedan: ALL_VIEWS,
+  hatchback: ALL_VIEWS,
+  suv: ALL_VIEWS,
+  furgon: ['lateral_der', 'lateral_izq', 'frente', 'trasera']
+};
+
+/**
+ * Única fuente de verdad para elegir el plano según la carrocería (la usan la app y el PDF).
+ * Coupé usa por ahora la silueta del sedán hasta tener un plano propio.
+ */
 export const getBlueprintKey = (bodyType: string): BlueprintKey => {
   const n = (bodyType || '').toLowerCase();
   if (n.includes('pick') || n.includes('caja')) return 'pickup';
+  if (n.includes('furg') || n.includes('utilit')) return 'furgon';
   if (n.includes('suv') || n.includes('camioneta') || n.includes('cerrada')) return 'suv';
   if (n.includes('hatch') || n.includes('sin baúl') || n.includes('sin baul')) return 'hatchback';
   return 'sedan';
 };
+
+export const isCoupe = (bodyType: string) => /coup/i.test(bodyType || '');
 
 export const blueprintSrc = (key: BlueprintKey, view: string) => `/blueprints/crops/${key}_${view}.jpg`;
 

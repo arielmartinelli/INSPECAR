@@ -1,22 +1,37 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   type InspectionData,
+  type ScoreValue,
+  type YesNoValue,
+  type ObsSection,
+  type Estado,
   getInteriorItems,
   EXTERIOR_ITEMS,
   MECANICA_ITEMS,
   ACCESORIOS_ITEMS,
-  type ScoreValue,
-  type YesNoValue
+  ESTADOS,
+  OBS_SECTION_LABEL,
+  normalizeMarkers,
+  compileObservaciones,
+  suggestMantenimiento
 } from './types/inspection';
+import { VEHICLE_BODY_TYPES } from './data/carData';
 import { VehicleHeaderForm } from './components/VehicleHeaderForm';
 import { InspectionSection } from './components/InspectionSection';
 import { AccessoriesSection } from './components/AccessoriesSection';
 import { CarDamageMap } from './components/CarDamageMap';
-import { HistoryPanel } from './components/HistoryPanel';
-import { loadHistory, saveToHistory, deleteFromHistory, hasContent, type HistoryEntry } from './utils/history';
+import { SectionNotes } from './components/SectionNotes';
+import { MaintenanceSection } from './components/MaintenanceSection';
+import { RecordsView } from './components/RecordsView';
+import { Sidebar, type NavStep } from './components/Sidebar';
+import { ThemeMenu } from './components/ThemeMenu';
+import { PinGate } from './components/PinGate';
+import { repo, hasContent, vehicleLabel } from './lib/repo';
+import { cloudEnabled, lockApp } from './lib/supabase';
+import { applyTheme, loadTheme, type ThemeId } from './lib/theme';
 import {
   FileDown,
-  RotateCcw,
+  Plus,
   Sparkles,
   ClipboardCheck,
   Armchair,
@@ -26,76 +41,79 @@ import {
   ChevronRight,
   ChevronLeft,
   Share2,
-  History,
-  Save,
-  type LucideIcon
+  Database,
+  ArrowLeft,
+  Pencil
 } from 'lucide-react';
-import { VEHICLE_BODY_TYPES } from './data/carData';
 
 const STORAGE_KEY = 'inspecar_draft_v3';
 
-const getInitialData = (): InspectionData => {
-  // Fecha local (toISOString usa UTC y después de las 21 h en Argentina da el día siguiente)
-  const today = new Date().toLocaleDateString('en-CA');
-  return {
-    id: 'INSP-' + Date.now().toString(36).toUpperCase(),
-    createdAt: new Date().toISOString(),
-    vehicle: {
-      tipoVehiculo: 'Sedán (Con baúl)',
-      marca: '',
-      modelo: '',
-      version: '',
-      anio: '',
-      dominio: '',
-      combustible: 'Nafta',
-      kilometros: '',
-      fecha: today,
-      itvVtv: '',
-      clienteNombre: '',
-      clienteTelefono: ''
-    },
-    interior: {},
-    exterior: {},
-    mecanica: {},
-    accesorios: {},
-    damageMarkers: [],
-    observaciones: '',
-    conclusionGeneral: ''
+type TabId = 'vehiculo' | 'interior' | 'exterior' | 'mecanica' | 'accesorios' | 'carroceria' | 'resumen';
+type ScoreSection = 'interior' | 'exterior' | 'mecanica';
+
+const getInitialData = (): InspectionData => ({
+  id: 'INSP-' + Date.now().toString(36).toUpperCase(),
+  createdAt: new Date().toISOString(),
+  vehicle: {
+    tipoVehiculo: 'Sedán (Con baúl)',
+    marca: '',
+    modelo: '',
+    version: '',
+    anio: '',
+    dominio: '',
+    combustible: 'Nafta',
+    kilometros: '',
+    // Fecha local (toISOString usa UTC y después de las 21 h en Argentina da el día siguiente)
+    fecha: new Date().toLocaleDateString('en-CA'),
+    itvVtv: '',
+    clienteNombre: '',
+    clienteDni: '',
+    clienteTelefono: ''
+  },
+  interior: {},
+  exterior: {},
+  mecanica: {},
+  accesorios: {},
+  damageMarkers: [],
+  observaciones: '',
+  obsSecciones: {},
+  estado: 'borrador',
+  conclusionGeneral: ''
+});
+
+/** Adapta cualquier inspección guardada (borrador, historial o base) a la versión actual. */
+const normalize = (parsed: Partial<InspectionData>): InspectionData => {
+  const base = getInitialData();
+  const data: InspectionData = {
+    ...base,
+    ...parsed,
+    vehicle: { ...base.vehicle, ...(parsed.vehicle ?? {}) },
+    interior: parsed.interior ?? {},
+    exterior: parsed.exterior ?? {},
+    mecanica: parsed.mecanica ?? {},
+    accesorios: parsed.accesorios ?? {},
+    obsSecciones: parsed.obsSecciones ?? {},
+    estado: parsed.estado ?? 'borrador',
+    damageMarkers: normalizeMarkers(parsed.damageMarkers) // "Bollo" → "Dañado"
   };
+  if (!VEHICLE_BODY_TYPES.includes(data.vehicle.tipoVehiculo)) data.vehicle.tipoVehiculo = base.vehicle.tipoVehiculo;
+  return data;
 };
 
-/** Lee el borrador guardado y lo adapta a la versión actual (ej: carrocerías que ya no existen). */
 const loadDraft = (): InspectionData => {
   try {
     const saved = localStorage.getItem(STORAGE_KEY);
-    if (!saved) return getInitialData();
-    const parsed = JSON.parse(saved) as Partial<InspectionData>;
-    const base = getInitialData();
-    const data: InspectionData = {
-      ...base,
-      ...parsed,
-      vehicle: { ...base.vehicle, ...(parsed.vehicle ?? {}) },
-      interior: parsed.interior ?? {},
-      exterior: parsed.exterior ?? {},
-      mecanica: parsed.mecanica ?? {},
-      accesorios: parsed.accesorios ?? {},
-      damageMarkers: Array.isArray(parsed.damageMarkers) ? parsed.damageMarkers : []
-    };
-    if (!VEHICLE_BODY_TYPES.includes(data.vehicle.tipoVehiculo)) {
-      data.vehicle.tipoVehiculo = base.vehicle.tipoVehiculo; // ej: borradores viejos con "Furgón / Utilitario"
-    }
-    return data;
-  } catch (e) {
-    console.error(e);
+    return saved ? normalize(JSON.parse(saved)) : getInitialData();
+  } catch {
     return getInitialData();
   }
 };
 
-const buildFileName = (data: InspectionData) => {
-  const v = data.vehicle;
+const buildFileName = (d: InspectionData, prefix = 'INSPECAR') => {
+  const v = d.vehicle;
   const brand = v.marca === 'OTRA' ? v.marcaPersonalizada : v.marca;
   const model = v.modelo === 'OTRO' ? v.modeloPersonalizado : v.modelo;
-  return `INSPECAR-${(v.dominio || 'AUTO').toUpperCase()}-${brand || ''}-${model || ''}.pdf`
+  return `${prefix}-${(v.dominio || 'AUTO').toUpperCase()}-${brand || ''}-${model || ''}.pdf`
     .replace(/\s+/g, '_')
     .replace(/[\\/:*?"<>|]/g, '');
 };
@@ -108,117 +126,134 @@ const canShareFiles = () => {
   }
 };
 
-export function App() {
-  const [data, setData] = useState<InspectionData>(loadDraft);
+const TABS: { id: TabId; label: string; icon: typeof Car }[] = [
+  { id: 'vehiculo', label: 'Vehículo', icon: Car },
+  { id: 'interior', label: 'Interior', icon: Armchair },
+  { id: 'exterior', label: 'Exterior', icon: Car },
+  { id: 'mecanica', label: 'Mecánica', icon: Wrench },
+  { id: 'accesorios', label: 'Accesorios', icon: ClipboardCheck },
+  { id: 'carroceria', label: 'Chapa', icon: Sparkles },
+  { id: 'resumen', label: 'Resumen', icon: FileText }
+];
 
-  const [activeTab, setActiveTab] = useState<'vehiculo' | 'interior' | 'exterior' | 'mecanica' | 'accesorios' | 'carroceria' | 'resumen'>('vehiculo');
+export function App() {
+  return (
+    <PinGate>
+      <Inspecar />
+    </PinGate>
+  );
+}
+
+function Inspecar() {
+  const [data, setData] = useState<InspectionData>(loadDraft);
+  const [view, setView] = useState<'inspeccion' | 'registros'>('inspeccion');
+  const [activeTab, setActiveTab] = useState<TabId>('vehiculo');
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [shareSupported] = useState(canShareFiles);
-
-  // Autoguardado con debounce (no escribe en cada tecla)
+  const [theme, setTheme] = useState<ThemeId>(loadTheme);
+  const [sync, setSync] = useState<'local' | 'saving' | 'saved' | 'pending'>(cloudEnabled ? 'saved' : 'local');
+  const [refreshKey, setRefreshKey] = useState(0);
+  const dataRef = useRef(data);
   useEffect(() => {
-    const timer = setTimeout(() => {
+    dataRef.current = data;
+  }, [data]);
+
+  useEffect(() => applyTheme(theme), [theme]);
+
+  // Borrador local inmediato (debounce corto)
+  useEffect(() => {
+    const t = setTimeout(() => {
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
       } catch (e) {
         console.error(e);
       }
     }, 300);
-    return () => clearTimeout(timer);
+    return () => clearTimeout(t);
   }, [data]);
 
-  // Al cambiar de paso, volver arriba (en el celular quedaba scrolleado abajo)
+  // Guardado en registros / base de datos (debounce más largo para no escribir en cada tecla)
+  useEffect(() => {
+    if (!hasContent(data)) return;
+    const t = setTimeout(async () => {
+      if (cloudEnabled) setSync('saving');
+      const ok = await repo.save(data);
+      if (cloudEnabled) setSync(ok ? 'saved' : 'pending');
+    }, 1500);
+    return () => clearTimeout(t);
+  }, [data]);
+
+  // Al volver la señal, subir lo pendiente
+  useEffect(() => {
+    const flush = () =>
+      repo.flush().then((n) => {
+        if (n > 0) {
+          setSync('saved');
+          setRefreshKey((k) => k + 1);
+        }
+      });
+    flush();
+    window.addEventListener('online', flush);
+    return () => window.removeEventListener('online', flush);
+  }, []);
+
   useEffect(() => {
     window.scrollTo({ top: 0 });
-  }, [activeTab]);
+  }, [activeTab, view]);
 
   const interiorItems = getInteriorItems(data.vehicle.tipoVehiculo);
   const sectionItems = { interior: interiorItems, exterior: EXTERIOR_ITEMS, mecanica: MECANICA_ITEMS };
 
-  const handleScoreChange = (
-    section: 'interior' | 'exterior' | 'mecanica',
-    item: string,
-    value: ScoreValue
-  ) => {
-    setData((prev) => ({
-      ...prev,
-      [section]: {
-        ...prev[section],
-        [item]: value
-      }
-    }));
-  };
-
-  const handleScoreBulk = (section: 'interior' | 'exterior' | 'mecanica', updates: Record<string, ScoreValue>) => {
+  // ── edición ───────────────────────────────────────────────
+  const handleScoreChange = (section: ScoreSection, item: string, value: ScoreValue) =>
+    setData((prev) => ({ ...prev, [section]: { ...prev[section], [item]: value } }));
+  const handleScoreBulk = (section: ScoreSection, updates: Record<string, ScoreValue>) =>
     setData((prev) => ({ ...prev, [section]: { ...prev[section], ...updates } }));
-  };
-
-  const handleAccessoryBulk = (updates: Record<string, YesNoValue>) => {
+  const handleAccessoryChange = (item: string, value: YesNoValue) =>
+    setData((prev) => ({ ...prev, accesorios: { ...prev.accesorios, [item]: value } }));
+  const handleAccessoryBulk = (updates: Record<string, YesNoValue>) =>
     setData((prev) => ({ ...prev, accesorios: { ...prev.accesorios, ...updates } }));
-  };
+  const setObs = (k: ObsSection, v: string) => setData((prev) => ({ ...prev, obsSecciones: { ...prev.obsSecciones, [k]: v } }));
 
-  const handleAccessoryChange = (item: string, value: YesNoValue) => {
-    setData((prev) => ({
-      ...prev,
-      accesorios: {
-        ...prev.accesorios,
-        [item]: value
-      }
-    }));
-  };
+  const notesFor = (k: ObsSection) => (
+    <SectionNotes id={`obs-${k}`} title={OBS_SECTION_LABEL[k]} value={data.obsSecciones?.[k] ?? ''} onChange={(v) => setObs(k, v)} />
+  );
 
-  // ── Historial ─────────────────────────────────────────────
-  const [history, setHistory] = useState<HistoryEntry[]>(loadHistory);
-  const [historyOpen, setHistoryOpen] = useState(false);
-  const [savedFlash, setSavedFlash] = useState(false);
+  // ── PDF ───────────────────────────────────────────────────
+  // jsPDF pesa ~400 KB: se descarga recién cuando se pide el PDF.
+  const buildPdf = async (d: InspectionData) => (await import('./utils/pdfGenerator')).generateInspectionPDF(d);
 
-  const archive = (d: InspectionData) => {
-    if (hasContent(d)) setHistory(saveToHistory(d));
-  };
-
-  const handleSaveToHistory = () => {
-    archive(data);
-    setSavedFlash(true);
-    setTimeout(() => setSavedFlash(false), 2000);
-  };
-
-  const handleOpenFromHistory = (d: InspectionData) => {
-    archive(data); // la planilla actual no se pierde: queda guardada antes de abrir otra
-    setData(d);
-    setActiveTab('vehiculo');
-    setHistoryOpen(false);
-  };
-
-  const handleDeleteFromHistory = (id: string) => setHistory(deleteFromHistory(id));
-
-  // jsPDF pesa ~400 KB: se descarga recién cuando se pide el PDF, así la app abre más rápido.
-  const buildPdf = async (d: InspectionData = data) => {
-    const { generateInspectionPDF } = await import('./utils/pdfGenerator');
-    return generateInspectionPDF(d);
-  };
-
-  const handleDownloadPDF = async (d: InspectionData = data) => {
+  const runPdf = async (fn: () => Promise<void>) => {
     setIsGeneratingPdf(true);
     try {
-      const doc = await buildPdf(d);
-      doc.save(buildFileName(d));
-      if (d.id === data.id) archive(d); // cada informe generado queda en el historial
+      await fn();
     } catch (error) {
-      console.error('Error generating PDF:', error);
+      console.error(error);
       alert('Hubo un error al generar el PDF. Verificá los datos.');
     } finally {
       setIsGeneratingPdf(false);
     }
   };
 
-  // Compartir el PDF directo (WhatsApp, mail, etc.) en celulares compatibles
+  const handleDownloadPDF = (d: InspectionData = data) =>
+    runPdf(async () => {
+      (await buildPdf(d)).save(buildFileName(d));
+      if (d.id === data.id && (data.estado ?? 'borrador') === 'borrador') setData((p) => ({ ...p, estado: 'finalizada' }));
+    });
+
+  const handleDownloadMaintenance = () =>
+    runPdf(async () => {
+      const { generateMaintenancePDF } = await import('./utils/maintenancePdf');
+      (await generateMaintenancePDF(data)).save(buildFileName(data, 'INSPECAR-MANTENIMIENTO'));
+    });
+
   const handleSharePDF = async () => {
     setIsGeneratingPdf(true);
     try {
-      const doc = await buildPdf();
-      archive(data);
+      const doc = await buildPdf(data);
       const file = new File([doc.output('blob')], buildFileName(data), { type: 'application/pdf' });
       await navigator.share({ files: [file], title: 'Informe INSPECAR' });
+      if ((data.estado ?? 'borrador') !== 'compro' && data.estado !== 'no_compro') setData((p) => ({ ...p, estado: 'entregada' }));
     } catch (error) {
       if ((error as Error)?.name !== 'AbortError') console.error(error);
     } finally {
@@ -226,29 +261,41 @@ export function App() {
     }
   };
 
-  const handleReset = () => {
-    const keep = hasContent(data);
-    const msg = keep
-      ? '¿Empezar una nueva inspección? La actual queda guardada en el Historial.'
-      : '¿Empezar una nueva inspección?';
-    if (window.confirm(msg)) {
-      archive(data);
-      const fresh = getInitialData();
-      try {
-        localStorage.removeItem(STORAGE_KEY);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(fresh));
-      } catch (e) {
-        console.error(e);
-      }
-      setData(fresh);
-      setActiveTab('vehiculo');
+  // ── registros ─────────────────────────────────────────────
+  const openRecord = useCallback(async (id: string) => {
+    const current = dataRef.current;
+    if (hasContent(current)) await repo.save(current); // la planilla actual no se pierde
+    const d = await repo.get(id);
+    if (!d) {
+      alert('No se encontró la inspección.');
+      return;
     }
+    setData(normalize(d));
+    setActiveTab('vehiculo');
+    setView('inspeccion');
+  }, []);
+
+  const downloadRecord = async (id: string) => {
+    const d = await repo.get(id);
+    if (d) handleDownloadPDF(normalize(d));
   };
 
-  // Totales sólo sobre los ítems visibles (ej: "Caja de carga" no cuenta en un sedán)
-  let totalB = 0, totalR = 0, totalM = 0;
-  const pendingBySection = { interior: 0, exterior: 0, mecanica: 0 };
-  (Object.keys(sectionItems) as (keyof typeof sectionItems)[]).forEach((sec) => {
+  const handleNew = async () => {
+    const msg = hasContent(data) ? '¿Empezar una nueva inspección? La actual queda guardada en Registros.' : '¿Empezar una nueva inspección?';
+    if (!window.confirm(msg)) return;
+    if (hasContent(data)) await repo.save(data);
+    setData(getInitialData());
+    setActiveTab('vehiculo');
+    setView('inspeccion');
+    setRefreshKey((k) => k + 1);
+  };
+
+  // ── totales ───────────────────────────────────────────────
+  let totalB = 0,
+    totalR = 0,
+    totalM = 0;
+  const pendingBySection: Record<ScoreSection, number> = { interior: 0, exterior: 0, mecanica: 0 };
+  (Object.keys(sectionItems) as ScoreSection[]).forEach((sec) => {
     sectionItems[sec].forEach((item) => {
       const v = data[sec][item];
       if (v === 'B' || v === 'B-R') totalB++;
@@ -258,343 +305,399 @@ export function App() {
     });
   });
   const totalPending = pendingBySection.interior + pendingBySection.exterior + pendingBySection.mecanica;
+  const accPending = ACCESORIOS_ITEMS.filter((i) => data.accesorios[i] == null).length;
 
-  const tabs: { id: typeof activeTab; step: string; label: string; icon: LucideIcon }[] = [
-    { id: 'vehiculo', step: '01', label: '1. Vehículo', icon: Car },
-    { id: 'interior', step: '02', label: '2. Interior', icon: Armchair },
-    { id: 'exterior', step: '03', label: '3. Exterior', icon: Car },
-    { id: 'mecanica', step: '04', label: '4. Mecánica', icon: Wrench },
-    { id: 'accesorios', step: '05', label: '5. Accesorios', icon: ClipboardCheck },
-    { id: 'carroceria', step: '06', label: '6. Chapa', icon: Sparkles },
-    { id: 'resumen', step: '07', label: '7. Resumen', icon: FileText }
-  ];
+  const navSteps: NavStep[] = TABS.map((t) => ({
+    id: t.id,
+    label: t.label,
+    icon: t.icon,
+    pending: t.id in pendingBySection ? pendingBySection[t.id as ScoreSection] : t.id === 'accesorios' ? accPending : 0,
+    done:
+      t.id === 'vehiculo'
+        ? Boolean(data.vehicle.dominio && data.vehicle.marca)
+        : t.id === 'resumen'
+          ? Boolean(data.conclusionGeneral)
+          : t.id === 'carroceria'
+            ? false
+            : true
+  }));
 
-  const currentTabIndex = tabs.findIndex((t) => t.id === activeTab);
-  const prevTab = currentTabIndex > 0 ? tabs[currentTabIndex - 1] : null;
-  const nextTab = currentTabIndex < tabs.length - 1 ? tabs[currentTabIndex + 1] : null;
+  const currentTabIndex = TABS.findIndex((t) => t.id === activeTab);
+  const prevTab = currentTabIndex > 0 ? TABS[currentTabIndex - 1] : null;
+  const nextTab = currentTabIndex < TABS.length - 1 ? TABS[currentTabIndex + 1] : null;
+  const goTab = (id: string) => {
+    setActiveTab(id as TabId);
+    setView('inspeccion');
+  };
+  const compiled = compileObservaciones(data);
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] text-slate-900 flex flex-col font-sans selection:bg-slate-900 selection:text-white pb-24">
-      {/* Top Header Bar Sticky: Título INSPECAR + Botón PDF */}
-      <header className="sticky top-0 z-40 bg-white border-b-2 border-slate-900 shadow-sm">
-        <div className="max-w-3xl mx-auto px-3 sm:px-4 py-2.5 flex items-center justify-between">
-          <div className="flex items-center">
-            <img
-              src="/logo.png"
-              alt="INSPECAR"
-              className="h-7 sm:h-8 w-auto object-contain"
-            />
-          </div>
+    <div className="min-h-screen lg:flex text-slate-900 font-sans selection:bg-slate-900 selection:text-white">
+      <Sidebar
+        steps={navSteps}
+        activeStep={activeTab}
+        view={view}
+        patente={data.vehicle.dominio}
+        vehiculo={vehicleLabel(data)}
+        cliente={[data.vehicle.clienteNombre, data.vehicle.clienteDni && `DNI ${data.vehicle.clienteDni}`].filter(Boolean).join(' · ')}
+        sync={sync}
+        canLock={cloudEnabled}
+        onStep={goTab}
+        onRecords={() => setView('registros')}
+        onNew={handleNew}
+        onLock={() => lockApp()}
+      />
 
-          {/* Top Actions: Reset + Botón PDF Directo */}
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setHistoryOpen(true)}
-              className="relative p-2 border-2 border-slate-300 text-slate-600 hover:border-slate-900 transition-colors"
-              title="Historial de inspecciones"
-              aria-label={`Historial de inspecciones (${history.length})`}
-            >
-              <History className="w-4 h-4" />
-              {history.length > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 min-w-4 h-4 px-1 bg-slate-900 text-white rounded-full text-[9px] font-bold flex items-center justify-center">
-                  {history.length}
-                </span>
-              )}
-            </button>
-
-            <button
-              type="button"
-              onClick={handleReset}
-              className="p-2 border-2 border-slate-300 text-slate-500 hover:text-rose-600 hover:border-slate-900 transition-colors"
-              title="Reiniciar planilla"
-              aria-label="Reiniciar planilla (nueva inspección)"
-            >
-              <RotateCcw className="w-4 h-4" />
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleDownloadPDF()}
-              disabled={isGeneratingPdf}
-              className="flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 disabled:opacity-60 text-white font-black px-4 py-2.5 text-xs uppercase tracking-wider border-2 border-slate-900 shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] active:translate-x-0.5 active:translate-y-0.5 transition-all"
-            >
-              <FileDown className="w-4 h-4" />
-              <span>{isGeneratingPdf ? 'Creando...' : 'PDF'}</span>
-            </button>
-          </div>
-        </div>
-
-        {/* BARRA DE PASOS EN LÍNEA ARRIBA CON SCROLL HORIZONTAL */}
-        <div className="border-t border-slate-200 bg-slate-50 overflow-x-auto scrollbar-none px-3 py-2 sm:py-2.5">
-          <div className="max-w-3xl mx-auto flex items-center gap-2 min-w-max">
-            {tabs.map((tab) => {
-              const active = activeTab === tab.id;
-              const Icon = tab.icon;
-
-              return (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center gap-2 px-3.5 sm:px-4 py-2 sm:py-2.5 border-2 text-xs sm:text-sm font-mono font-bold uppercase tracking-wider whitespace-nowrap transition-all ${
-                    active
-                      ? 'bg-slate-900 border-slate-900 text-white shadow-[3px_3px_0px_0px_rgba(15,23,42,1)] scale-[1.02]'
-                      : 'bg-white border-slate-300 text-slate-700 hover:border-slate-900 hover:text-slate-900'
-                  }`}
-                >
-                  <Icon className="w-4 h-4 sm:w-4.5 sm:h-4.5 shrink-0" />
-                  <span>{tab.label}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      </header>
-
-      {/* Main Container */}
-      <main className="flex-1 max-w-3xl w-full mx-auto p-3 sm:p-5">
-        {/* Autosave status line */}
-        <div className="flex items-center justify-between text-[11px] text-slate-400 mb-3 px-1 font-mono">
-          <div className="flex items-center gap-1.5">
-            <span className="w-2 h-2 bg-emerald-600 inline-block" />
-            <span>Auto guardado</span>
-          </div>
-          <span className="font-bold text-slate-600">
-            Paso {tabs[currentTabIndex].step} de 07: {tabs[currentTabIndex].label}
-          </span>
-        </div>
-
-        {/* TAB 1: VEHICULO */}
-        {activeTab === 'vehiculo' && (
-          <VehicleHeaderForm
-            vehicle={data.vehicle}
-            onChange={(updated) => setData((prev) => ({ ...prev, vehicle: updated }))}
-          />
-        )}
-
-        {/* TAB 2: INTERIOR */}
-        {activeTab === 'interior' && (
-          <InspectionSection
-            title="Puntos de Control: Interior"
-            stepNumber="02"
-            items={interiorItems}
-            values={data.interior}
-            onChange={(item, val) => handleScoreChange('interior', item, val)}
-            onBulkChange={(updates) => handleScoreBulk('interior', updates)}
-            icon={<Armchair className="w-5 h-5 text-slate-900" />}
-          />
-        )}
-
-        {/* TAB 3: EXTERIOR */}
-        {activeTab === 'exterior' && (
-          <InspectionSection
-            title="Puntos de Control: Exterior"
-            stepNumber="03"
-            items={EXTERIOR_ITEMS}
-            values={data.exterior}
-            onChange={(item, val) => handleScoreChange('exterior', item, val)}
-            onBulkChange={(updates) => handleScoreBulk('exterior', updates)}
-            icon={<Car className="w-5 h-5 text-slate-900" />}
-          />
-        )}
-
-        {/* TAB 4: MECANICA */}
-        {activeTab === 'mecanica' && (
-          <InspectionSection
-            title="Puntos de Control: Mecánica"
-            stepNumber="04"
-            items={MECANICA_ITEMS}
-            values={data.mecanica}
-            onChange={(item, val) => handleScoreChange('mecanica', item, val)}
-            onBulkChange={(updates) => handleScoreBulk('mecanica', updates)}
-            icon={<Wrench className="w-5 h-5 text-slate-900" />}
-          />
-        )}
-
-        {/* TAB 5: ACCESORIOS */}
-        {activeTab === 'accesorios' && (
-          <AccessoriesSection
-            items={ACCESORIOS_ITEMS}
-            values={data.accesorios}
-            onChange={handleAccessoryChange}
-            onBulkChange={handleAccessoryBulk}
-          />
-        )}
-
-        {/* TAB 6: CARROCERIA & DAÑOS */}
-        {activeTab === 'carroceria' && (
-          <CarDamageMap
-            markers={data.damageMarkers}
-            bodyType={data.vehicle.tipoVehiculo}
-            onBodyTypeChange={(newType) =>
-              setData((prev) => ({
-                ...prev,
-                vehicle: { ...prev.vehicle, tipoVehiculo: newType }
-              }))
-            }
-            onChange={(markers) => setData((prev) => ({ ...prev, damageMarkers: markers }))}
-          />
-        )}
-
-        {/* TAB 7: RESUMEN, OBSERVACIONES & DICTAMEN */}
-        {activeTab === 'resumen' && (
-          <div className="space-y-4">
-            {/* Balance general */}
-            <div className="bg-white border-2 border-slate-900 shadow-[4px_4px_0px_0px_rgba(15,23,42,1)] p-4">
-              <h3 className="text-xs font-black uppercase tracking-wider text-slate-900 mb-3 border-b-2 border-slate-900 pb-1.5">
-                Balance Total de Inspección
-              </h3>
-              <div className="grid grid-cols-3 gap-2">
-                <div className="border-2 border-slate-900 bg-emerald-50 p-2.5 text-center">
-                  <div className="text-2xl font-black font-mono text-emerald-800">{totalB}</div>
-                  <div className="text-[10px] font-bold uppercase text-emerald-900">Buenos</div>
-                </div>
-                <div className="border-2 border-slate-900 bg-amber-50 p-2.5 text-center">
-                  <div className="text-2xl font-black font-mono text-amber-800">{totalR}</div>
-                  <div className="text-[10px] font-bold uppercase text-amber-900">Regulares</div>
-                </div>
-                <div className="border-2 border-slate-900 bg-rose-50 p-2.5 text-center">
-                  <div className="text-2xl font-black font-mono text-rose-800">{totalM}</div>
-                  <div className="text-[10px] font-bold uppercase text-rose-900">Malos</div>
-                </div>
+      <div className="flex-1 min-w-0 flex flex-col pb-24 lg:pb-0">
+        {/* Cabecera */}
+        <header className="app-topbar sticky top-0 z-40 bg-white border-b-2 border-slate-900 shadow-sm">
+          <div className="max-w-3xl lg:max-w-5xl mx-auto px-3 sm:px-4 lg:px-8 py-2.5 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-3 min-w-0">
+              <img src="/logo.png" alt="INSPECAR" className="logo-img h-7 sm:h-8 w-auto object-contain lg:hidden" />
+              <div className="hidden lg:block min-w-0">
+                <p className="text-[11px] font-mono uppercase tracking-widest opacity-60">
+                  {view === 'registros' ? 'Gestión' : `Paso ${currentTabIndex + 1} de ${TABS.length}`}
+                </p>
+                <h1 className="text-xl font-black tracking-tight truncate">
+                  {view === 'registros' ? 'Registros y seguimiento' : TABS[currentTabIndex].label}
+                </h1>
               </div>
-
-              {totalPending > 0 && (
-                <div className="mt-3 border-2 border-amber-500 bg-amber-50 p-2.5 text-xs text-amber-900">
-                  <strong>Faltan {totalPending} ítems sin evaluar:</strong>{' '}
-                  {(Object.keys(pendingBySection) as (keyof typeof pendingBySection)[])
-                    .filter((sec) => pendingBySection[sec] > 0)
-                    .map((sec, i, arr) => (
-                      <span key={sec}>
-                        <button type="button" className="underline font-bold" onClick={() => setActiveTab(sec)}>
-                          {sec === 'interior' ? 'Interior' : sec === 'exterior' ? 'Exterior' : 'Mecánica'} ({pendingBySection[sec]})
-                        </button>
-                        {i < arr.length - 1 ? ' · ' : ''}
-                      </span>
-                    ))}
-                </div>
-              )}
             </div>
 
-            {/* Dictamen */}
-            <div className="bg-white border-2 border-slate-900 shadow-[4px_4px_0px_0px_rgba(15,23,42,1)] p-4">
-              <label htmlFor="dictamen" className="block text-xs font-black uppercase tracking-wider text-slate-900 mb-2">
-                Dictamen Final Pre-Compra
-              </label>
-              <select
-                id="dictamen"
-                value={data.conclusionGeneral || ''}
-                onChange={(e) =>
-                  setData((prev) => ({ ...prev, conclusionGeneral: e.target.value as InspectionData['conclusionGeneral'] }))
-                }
-                className="w-full bg-slate-50 border-2 border-slate-900 px-3 py-2.5 text-xs font-bold text-slate-900 focus:outline-none focus:bg-white"
-              >
-                <option value="">— Elegir dictamen —</option>
-                <option value="Recomendado">🟢 Recomendado (Buen estado general)</option>
-                <option value="Con reparaciones pendientes">🟡 Recomendado con reparaciones / mantenimiento a considerar</option>
-                <option value="No recomendado">🔴 No recomendado (Riesgos mecánicos severos)</option>
-                <option value="A criterio del comprador">⚪ A criterio del comprador</option>
-              </select>
-            </div>
-
-            {/* Observaciones */}
-            <div className="bg-white border-2 border-slate-900 shadow-[4px_4px_0px_0px_rgba(15,23,42,1)] p-4">
-              <label htmlFor="observaciones" className="block text-xs font-black uppercase tracking-wider text-slate-900 mb-2">
-                Observaciones Detalladas
-              </label>
-              <textarea
-                id="observaciones"
-                rows={6}
-                value={data.observaciones}
-                onChange={(e) => setData((prev) => ({ ...prev, observaciones: e.target.value }))}
-                placeholder="Escribe el reporte técnico detallado..."
-                className="w-full bg-slate-50 border-2 border-slate-900 p-3 text-sm font-medium text-slate-900 focus:outline-none focus:bg-white leading-relaxed"
-              />
-            </div>
-
-            <button
-              type="button"
-              onClick={handleSaveToHistory}
-              className="w-full h-12 border-2 border-slate-900 bg-white hover:bg-slate-50 text-slate-900 font-black text-sm uppercase flex items-center justify-center gap-2 shadow-[3px_3px_0px_0px_rgba(15,23,42,1)]"
-            >
-              <Save className="w-4 h-4" aria-hidden />
-              {savedFlash ? '✓ Guardada en el historial' : 'Guardar en historial'}
-            </button>
-
-            {shareSupported && (
+            <div className="flex items-center gap-2">
+              <ThemeMenu value={theme} onChange={setTheme} />
               <button
                 type="button"
-                onClick={handleSharePDF}
-                disabled={isGeneratingPdf}
-                className="w-full h-12 border-2 border-slate-900 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-black text-sm uppercase flex items-center justify-center gap-2 shadow-[3px_3px_0px_0px_rgba(15,23,42,1)]"
+                onClick={() => setView(view === 'registros' ? 'inspeccion' : 'registros')}
+                className="lg:hidden p-2 border-2 border-slate-300 text-slate-600 hover:border-slate-900 bg-white"
+                title="Registros"
+                aria-label={view === 'registros' ? 'Volver a la inspección' : 'Ver registros'}
               >
-                <Share2 className="w-4 h-4" aria-hidden />
-                Compartir PDF (WhatsApp, mail…)
+                {view === 'registros' ? <ArrowLeft className="w-4 h-4" /> : <Database className="w-4 h-4" />}
+              </button>
+              <button
+                type="button"
+                onClick={handleNew}
+                className="p-2 border-2 border-slate-300 text-slate-600 hover:border-slate-900 bg-white"
+                title="Nueva inspección"
+                aria-label="Nueva inspección"
+              >
+                <Plus className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => handleDownloadPDF()}
+                disabled={isGeneratingPdf}
+                className="btn-accent flex items-center gap-1.5 disabled:opacity-60 font-black px-4 py-2.5 text-xs uppercase tracking-wider border-2 shadow-[2px_2px_0px_0px_rgba(15,23,42,1)]"
+              >
+                <FileDown className="w-4 h-4" aria-hidden />
+                <span>{isGeneratingPdf ? 'Creando…' : 'PDF'}</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Pasos (sólo celular/tablet; en PC está la barra lateral) */}
+          {view === 'inspeccion' && (
+            <nav aria-label="Pasos" className="lg:hidden border-t border-slate-200 bg-slate-50 overflow-x-auto scrollbar-none px-3 py-2">
+              <div className="max-w-3xl mx-auto flex items-center gap-2 min-w-max">
+                {TABS.map((tab, i) => {
+                  const active = activeTab === tab.id;
+                  const Icon = tab.icon;
+                  const pend = navSteps[i].pending;
+                  return (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      aria-current={active ? 'step' : undefined}
+                      onClick={() => setActiveTab(tab.id)}
+                      className={`flex items-center gap-2 px-3.5 py-2 border-2 text-xs font-mono font-bold uppercase tracking-wider whitespace-nowrap ${
+                        active ? 'bg-slate-900 border-slate-900 text-white' : 'bg-white border-slate-300 text-slate-700 hover:border-slate-900'
+                      }`}
+                    >
+                      <Icon className="w-4 h-4 shrink-0" aria-hidden />
+                      <span>
+                        {i + 1}. {tab.label}
+                      </span>
+                      {pend > 0 && !active && <span className="text-[9px] bg-amber-200 text-amber-900 px-1">{pend}</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            </nav>
+          )}
+        </header>
+
+        <main className="flex-1 max-w-3xl lg:max-w-5xl w-full mx-auto p-3 sm:p-5 lg:p-8">
+          {view === 'registros' ? (
+            <RecordsView
+              currentId={data.id}
+              refreshKey={refreshKey}
+              busy={isGeneratingPdf}
+              onOpen={openRecord}
+              onDownload={downloadRecord}
+              onDeleted={(id) => {
+                if (id === data.id) setData(getInitialData());
+              }}
+            />
+          ) : (
+            <>
+              <p className="lg:hidden flex items-center justify-between text-[11px] text-slate-500 mb-3 px-1 font-mono">
+                <span>
+                  {sync === 'pending' ? '● Sin señal: se sube después' : sync === 'saving' ? '● Guardando…' : '● Guardado'}
+                </span>
+                <span className="font-bold text-slate-600">
+                  Paso {currentTabIndex + 1} de {TABS.length}
+                </span>
+              </p>
+
+              {activeTab === 'vehiculo' && (
+                <VehicleHeaderForm vehicle={data.vehicle} onChange={(vehicle) => setData((p) => ({ ...p, vehicle }))} />
+              )}
+
+              {(['interior', 'exterior', 'mecanica'] as const).map(
+                (sec) =>
+                  activeTab === sec && (
+                    <div key={sec}>
+                      <InspectionSection
+                        title={`Puntos de control: ${OBS_SECTION_LABEL[sec]}`}
+                        stepNumber={String(currentTabIndex + 1).padStart(2, '0')}
+                        items={sectionItems[sec]}
+                        values={data[sec]}
+                        onChange={(item, val) => handleScoreChange(sec, item, val)}
+                        onBulkChange={(u) => handleScoreBulk(sec, u)}
+                        icon={sec === 'interior' ? <Armchair className="w-5 h-5" /> : sec === 'mecanica' ? <Wrench className="w-5 h-5" /> : <Car className="w-5 h-5" />}
+                      />
+                      {notesFor(sec)}
+                    </div>
+                  )
+              )}
+
+              {activeTab === 'accesorios' && (
+                <>
+                  <AccessoriesSection
+                    items={ACCESORIOS_ITEMS}
+                    values={data.accesorios}
+                    onChange={handleAccessoryChange}
+                    onBulkChange={handleAccessoryBulk}
+                  />
+                  {notesFor('accesorios')}
+                </>
+              )}
+
+              {activeTab === 'carroceria' && (
+                <>
+                  <CarDamageMap
+                    markers={data.damageMarkers}
+                    bodyType={data.vehicle.tipoVehiculo}
+                    onBodyTypeChange={(tipoVehiculo) => setData((p) => ({ ...p, vehicle: { ...p.vehicle, tipoVehiculo } }))}
+                    onChange={(damageMarkers) => setData((p) => ({ ...p, damageMarkers }))}
+                  />
+                  {notesFor('carroceria')}
+                </>
+              )}
+
+              {activeTab === 'resumen' && (
+                <div className="space-y-4 lg:grid lg:grid-cols-2 lg:gap-5 lg:space-y-0">
+                  <section className="bg-white border-2 border-slate-900 shadow-[4px_4px_0px_0px_rgba(15,23,42,1)] p-4">
+                    <h2 className="text-xs font-black uppercase tracking-wider text-slate-900 mb-3 border-b-2 border-slate-900 pb-1.5">
+                      Balance total de inspección
+                    </h2>
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="border-2 border-slate-900 bg-emerald-50 p-2.5 text-center">
+                        <div className="text-2xl font-black font-mono text-emerald-800">{totalB}</div>
+                        <div className="text-[10px] font-bold uppercase text-emerald-900">Buenos</div>
+                      </div>
+                      <div className="border-2 border-slate-900 bg-amber-50 p-2.5 text-center">
+                        <div className="text-2xl font-black font-mono text-amber-800">{totalR}</div>
+                        <div className="text-[10px] font-bold uppercase text-amber-900">Regulares</div>
+                      </div>
+                      <div className="border-2 border-slate-900 bg-rose-50 p-2.5 text-center">
+                        <div className="text-2xl font-black font-mono text-rose-800">{totalM}</div>
+                        <div className="text-[10px] font-bold uppercase text-rose-900">Malos</div>
+                      </div>
+                    </div>
+                    {totalPending > 0 && (
+                      <div className="mt-3 border-2 border-amber-500 bg-amber-50 p-2.5 text-xs text-amber-900">
+                        <strong>Faltan {totalPending} ítems sin evaluar:</strong>{' '}
+                        {(Object.keys(pendingBySection) as ScoreSection[])
+                          .filter((s) => pendingBySection[s] > 0)
+                          .map((s, i, arr) => (
+                            <span key={s}>
+                              <button type="button" className="underline font-bold" onClick={() => setActiveTab(s)}>
+                                {OBS_SECTION_LABEL[s]} ({pendingBySection[s]})
+                              </button>
+                              {i < arr.length - 1 ? ' · ' : ''}
+                            </span>
+                          ))}
+                      </div>
+                    )}
+                  </section>
+
+                  <section className="bg-white border-2 border-slate-900 shadow-[4px_4px_0px_0px_rgba(15,23,42,1)] p-4">
+                    <label htmlFor="dictamen" className="block text-xs font-black uppercase tracking-wider text-slate-900 mb-2">
+                      Dictamen final pre-compra
+                    </label>
+                    <select
+                      id="dictamen"
+                      value={data.conclusionGeneral || ''}
+                      onChange={(e) => setData((p) => ({ ...p, conclusionGeneral: e.target.value as InspectionData['conclusionGeneral'] }))}
+                      className="w-full bg-slate-50 border-2 border-slate-900 px-3 py-2.5 text-sm font-bold text-slate-900 focus:outline-none focus:bg-white"
+                    >
+                      <option value="">— Elegir dictamen —</option>
+                      <option value="Recomendado">🟢 Recomendado (buen estado general)</option>
+                      <option value="Con reparaciones pendientes">🟡 Recomendado con reparaciones a considerar</option>
+                      <option value="No recomendado">🔴 No recomendado (riesgos mecánicos severos)</option>
+                      <option value="A criterio del comprador">⚪ A criterio del comprador</option>
+                    </select>
+
+                    <p className="block text-xs font-black uppercase tracking-wider text-slate-900 mt-4 mb-2">Estado del seguimiento</p>
+                    <div className="grid grid-cols-3 sm:grid-cols-5 gap-1.5" role="radiogroup" aria-label="Estado">
+                      {ESTADOS.map((e) => (
+                        <button
+                          key={e.id}
+                          type="button"
+                          role="radio"
+                          aria-checked={(data.estado ?? 'borrador') === e.id}
+                          onClick={() => setData((p) => ({ ...p, estado: e.id as Estado }))}
+                          className={`px-1.5 py-2 border-2 text-[11px] font-bold ${
+                            (data.estado ?? 'borrador') === e.id ? 'bg-slate-900 border-slate-900 text-white' : 'border-slate-300 hover:border-slate-900'
+                          }`}
+                        >
+                          {e.label}
+                        </button>
+                      ))}
+                    </div>
+                  </section>
+
+                  <section className="bg-white border-2 border-slate-900 shadow-[4px_4px_0px_0px_rgba(15,23,42,1)] p-4 lg:col-span-2">
+                    <h2 className="text-xs font-black uppercase tracking-wider text-slate-900 mb-2">Observaciones del informe</h2>
+                    {compiled.filter((c) => c.titulo !== 'General').length === 0 ? (
+                      <p className="text-xs text-slate-500 mb-3">
+                        Todavía no hay observaciones por sección. Se cargan al final de Interior, Exterior, Mecánica, Accesorios y Chapa.
+                      </p>
+                    ) : (
+                      <ul className="mb-3 space-y-2">
+                        {(Object.keys(OBS_SECTION_LABEL) as ObsSection[])
+                          .filter((k) => data.obsSecciones?.[k]?.trim())
+                          .map((k) => (
+                            <li key={k} className="bg-slate-50 border border-slate-200 p-2.5 text-sm">
+                              <div className="flex items-center justify-between gap-2 mb-0.5">
+                                <span className="text-[11px] font-black uppercase tracking-wider text-slate-700">{OBS_SECTION_LABEL[k]}</span>
+                                <button type="button" onClick={() => setActiveTab(k)} className="text-[11px] font-bold text-slate-600 flex items-center gap-1 hover:underline">
+                                  <Pencil className="w-3 h-3" aria-hidden /> Editar
+                                </button>
+                              </div>
+                              <p className="whitespace-pre-wrap text-slate-800">{data.obsSecciones?.[k]}</p>
+                            </li>
+                          ))}
+                      </ul>
+                    )}
+                    <label htmlFor="observaciones" className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
+                      Observaciones generales (opcional)
+                    </label>
+                    <textarea
+                      id="observaciones"
+                      rows={4}
+                      value={data.observaciones}
+                      onChange={(e) => setData((p) => ({ ...p, observaciones: e.target.value }))}
+                      placeholder="Algo que no entre en ninguna sección, o una conclusión para el comprador…"
+                      className="w-full bg-slate-50 border-2 border-slate-900 p-3 text-sm font-medium text-slate-900 focus:outline-none focus:bg-white leading-relaxed"
+                    />
+                  </section>
+
+                  <div className="lg:col-span-2 grid gap-2.5 sm:grid-cols-2">
+                    <button
+                      type="button"
+                      onClick={() => handleDownloadPDF()}
+                      disabled={isGeneratingPdf}
+                      className="btn-accent h-12 border-2 font-black text-sm uppercase flex items-center justify-center gap-2 disabled:opacity-60"
+                    >
+                      <FileDown className="w-4 h-4" aria-hidden /> Descargar informe PDF
+                    </button>
+                    {shareSupported && (
+                      <button
+                        type="button"
+                        onClick={handleSharePDF}
+                        disabled={isGeneratingPdf}
+                        className="h-12 border-2 border-emerald-700 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-black text-sm uppercase flex items-center justify-center gap-2"
+                      >
+                        <Share2 className="w-4 h-4" aria-hidden /> Compartir PDF (WhatsApp…)
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="lg:col-span-2">
+                    <MaintenanceSection
+                      value={data.mantenimiento}
+                      onChange={(mantenimiento) => setData((p) => ({ ...p, mantenimiento }))}
+                      onSuggest={() => suggestMantenimiento(data, interiorItems)}
+                      onDownload={handleDownloadMaintenance}
+                      busy={isGeneratingPdf}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Anterior / siguiente en PC (en el celular está la barra fija de abajo) */}
+              <div className="hidden lg:flex items-center justify-between mt-8">
+                {prevTab ? (
+                  <button type="button" onClick={() => setActiveTab(prevTab.id)} className="h-11 px-4 border-2 border-slate-900 bg-white font-bold text-sm flex items-center gap-1.5">
+                    <ChevronLeft className="w-4 h-4" aria-hidden /> {prevTab.label}
+                  </button>
+                ) : (
+                  <span />
+                )}
+                {nextTab && (
+                  <button type="button" onClick={() => setActiveTab(nextTab.id)} className="btn-accent h-11 px-5 border-2 font-black text-sm flex items-center gap-1.5">
+                    Siguiente: {nextTab.label} <ChevronRight className="w-4 h-4" aria-hidden />
+                  </button>
+                )}
+              </div>
+            </>
+          )}
+        </main>
+      </div>
+
+      {/* Barra inferior (celular) */}
+      {view === 'inspeccion' && (
+        <div className="lg:hidden fixed bottom-0 inset-x-0 z-50 bg-white/95 backdrop-blur-md border-t-2 border-slate-900 p-2 sm:p-3 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+          <div className="max-w-lg mx-auto flex items-center justify-between gap-2">
+            {prevTab ? (
+              <button
+                type="button"
+                onClick={() => setActiveTab(prevTab.id)}
+                className="h-11 px-3.5 border-2 border-slate-900 bg-white text-slate-900 font-bold text-xs uppercase font-mono flex items-center gap-1 shrink-0"
+              >
+                <ChevronLeft className="w-4 h-4 stroke-[3]" aria-hidden /> Volver
+              </button>
+            ) : (
+              <div className="w-20" />
+            )}
+            <div className="flex border-2 border-slate-900 font-mono text-xs font-black divide-x-2 divide-slate-900 bg-white">
+              <span className="px-2 py-1.5 text-emerald-700 bg-emerald-50">B:{totalB}</span>
+              <span className="px-2 py-1.5 text-amber-700 bg-amber-50">R:{totalR}</span>
+              <span className="px-2 py-1.5 text-rose-700 bg-rose-50">M:{totalM}</span>
+            </div>
+            {nextTab ? (
+              <button
+                type="button"
+                onClick={() => setActiveTab(nextTab.id)}
+                className="btn-accent h-11 px-4 border-2 font-black text-xs uppercase font-mono flex items-center gap-1.5 shrink-0"
+              >
+                Siguiente <ChevronRight className="w-4 h-4 stroke-[3]" aria-hidden />
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => handleDownloadPDF()}
+                disabled={isGeneratingPdf}
+                className="btn-accent h-11 px-4 border-2 font-black text-xs uppercase font-mono flex items-center gap-1.5 shrink-0"
+              >
+                <FileDown className="w-4 h-4" aria-hidden /> {isGeneratingPdf ? 'Creando…' : 'PDF final'}
               </button>
             )}
           </div>
-        )}
-      </main>
-
-      {/* BARRA INFERIOR FIJA: VOLVER + RESUMEN EN EL MEDIO + SIGUIENTE */}
-      <div className="fixed bottom-0 inset-x-0 z-50 bg-white/95 backdrop-blur-md border-t-2 border-slate-900 p-2 sm:p-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] shadow-[0_-4px_10px_rgba(15,23,42,0.08)]">
-        <div className="max-w-lg mx-auto flex items-center justify-between gap-2">
-          {/* Botón Volver */}
-          {prevTab ? (
-            <button
-              type="button"
-              onClick={() => setActiveTab(prevTab.id)}
-              className="h-11 px-3.5 border-2 border-slate-900 bg-white hover:bg-slate-50 text-slate-900 font-bold text-xs uppercase font-mono flex items-center gap-1 active:scale-95 transition-all shrink-0"
-            >
-              <ChevronLeft className="w-4 h-4 stroke-[3]" />
-              <span>Volver</span>
-            </button>
-          ) : (
-            <div className="w-20" />
-          )}
-
-          {/* Resumen en el medio: B / R / M */}
-          <div className="flex border-2 border-slate-900 font-mono text-xs font-black divide-x-2 divide-slate-900 bg-white shadow-sm">
-            <span className="px-2.5 py-1.5 text-emerald-700 bg-emerald-50">B:{totalB}</span>
-            <span className="px-2.5 py-1.5 text-amber-700 bg-amber-50">R:{totalR}</span>
-            <span className="px-2.5 py-1.5 text-rose-700 bg-rose-50">M:{totalM}</span>
-          </div>
-
-          {/* Botón Siguiente / Descargar PDF final */}
-          {nextTab ? (
-            <button
-              type="button"
-              onClick={() => setActiveTab(nextTab.id)}
-              className="h-11 px-4 border-2 border-slate-900 bg-slate-900 hover:bg-slate-800 text-white font-black text-xs uppercase font-mono flex items-center gap-1.5 active:scale-95 shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] transition-all shrink-0"
-            >
-              <span>Siguiente</span>
-              <ChevronRight className="w-4 h-4 stroke-[3]" />
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => handleDownloadPDF()}
-              disabled={isGeneratingPdf}
-              className="h-11 px-4 border-2 border-slate-900 bg-slate-900 hover:bg-slate-800 text-white font-black text-xs uppercase font-mono flex items-center gap-1.5 active:scale-95 shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] transition-all shrink-0"
-            >
-              <FileDown className="w-4 h-4" />
-              <span>{isGeneratingPdf ? 'Creando...' : 'PDF Final'}</span>
-            </button>
-          )}
         </div>
-      </div>
-
-      {historyOpen && (
-        <HistoryPanel
-          entries={history}
-          currentId={data.id}
-          busy={isGeneratingPdf}
-          onClose={() => setHistoryOpen(false)}
-          onOpen={handleOpenFromHistory}
-          onDownload={(d) => handleDownloadPDF(d)}
-          onDelete={handleDeleteFromHistory}
-        />
       )}
     </div>
   );

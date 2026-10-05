@@ -2,8 +2,133 @@
 
 @layer base {
   body {
-    background-color: #f8fafc;
+    background-color: var(--app-bg, #f8fafc);
     color: #0f172a;
-    font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-family: var(--font-sans);
   }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   ESTILOS INTERCAMBIABLES (botón de paleta en la cabecera)
+   Tailwind v4 usa variables CSS para toda la paleta: cambiando
+   las variables por tema se re-colorea toda la app sin tocar cada
+   componente. Lo estructural (bordes, sombras, radios) se ajusta
+   abajo con selectores puntuales.
+   ══════════════════════════════════════════════════════════════ */
+
+:root {
+  --app-bg: #f8fafc;
+  --accent: #0f172a;      /* botón principal (Siguiente / PDF) */
+  --accent-ink: #ffffff;
+}
+
+/* ── Tema "Taller": grafito + amarillo seguridad, tarjetas redondeadas ── */
+:root[data-theme='taller'] {
+  --app-bg: #f2f3f1;
+  --accent: #ffc20e;
+  --accent-ink: #1e2124;
+  --font-sans: 'Barlow', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'Barlow Condensed', 'Barlow', ui-sans-serif, sans-serif;
+  --color-slate-950: #15171a;
+  --color-slate-900: #1e2124;
+  --color-slate-800: #2c3035;
+  --color-slate-700: #3f454c;
+  --color-slate-600: #5b626a;
+  --color-slate-500: #737a82;
+  --color-slate-400: #9aa0a6;
+  --color-slate-300: #d5d8db;
+  --color-slate-200: #e4e6e3;
+  --color-slate-100: #ecedeb;
+  --color-slate-50: #f6f7f5;
+  --color-emerald-600: #1e9e5a;
+  --color-emerald-500: #25b065;
+  --color-amber-500: #f08c00;
+  --color-amber-400: #f5a524;
+  --color-rose-600: #d93636;
+  --color-rose-500: #e04848;
+}
+:root[data-theme='taller'] [class*='shadow-[4px_4px'] {
+  border-radius: 16px;
+  border-color: transparent !important;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.06), 0 4px 14px rgb(0 0 0 / 0.05) !important;
+}
+:root[data-theme='taller'] [class*='shadow-[2px_2px'],
+:root[data-theme='taller'] [class*='shadow-[3px_3px'] {
+  box-shadow: none !important;
+}
+:root[data-theme='taller'] button,
+:root[data-theme='taller'] input,
+:root[data-theme='taller'] select,
+:root[data-theme='taller'] textarea {
+  border-radius: 10px;
+}
+:root[data-theme='taller'] .app-topbar {
+  background: #1e2124;
+  color: #f2f3f1;
+  border-color: #1e2124;
+}
+:root[data-theme='taller'] .app-topbar .logo-img { filter: invert(1) brightness(2); }
+:root[data-theme='taller'] .app-sidebar { background: #1e2124; color: #e4e6e3; border-color: #1e2124; }
+:root[data-theme='taller'] .app-sidebar .logo-img { filter: invert(1) brightness(2); }
+:root[data-theme='taller'] .app-sidebar .nav-item { color: #c9ccd0; border-color: transparent; background: transparent; }
+:root[data-theme='taller'] .app-sidebar .nav-item:hover { background: #2c3035; }
+:root[data-theme='taller'] .app-sidebar .nav-item[aria-current] { background: #ffc20e; color: #1e2124; }
+:root[data-theme='taller'] .app-sidebar .muted { color: #9aa0a6; }
+:root[data-theme='taller'] .app-sidebar .veh-card { background: #2c3035; border-color: #2c3035; }
+:root[data-theme='taller'] .app-sidebar .veh-card .muted { color: #9aa0a6; }
+:root[data-theme='taller'] .app-sidebar .sync-ok { color: #3ddc84; }
+:root[data-theme='taller'] .plate { border-radius: 8px; }
+:root[data-theme='taller'] h2,
+:root[data-theme='taller'] h3 { font-family: 'Barlow Condensed', sans-serif; letter-spacing: 0.02em; }
+
+/* ── Tema "Ficha técnica": papel milimetrado, tinta azul, líneas finas ── */
+:root[data-theme='ficha'] {
+  --app-bg: #eef2f5;
+  --accent: #1c7ed6;
+  --accent-ink: #ffffff;
+  --font-sans: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --color-slate-950: #0b1f33;
+  --color-slate-900: #102a43;
+  --color-slate-800: #243b53;
+  --color-slate-700: #334e68;
+  --color-slate-600: #486581;
+  --color-slate-500: #627d98;
+  --color-slate-400: #829ab1;
+  --color-slate-300: #bcccdc;
+  --color-slate-200: #d9e2ec;
+  --color-slate-100: #e6edf3;
+  --color-slate-50: #f5f8fa;
+  --color-emerald-600: #2f9e44;
+  --color-emerald-500: #37b24d;
+  --color-amber-500: #e67700;
+  --color-amber-400: #f08c00;
+  --color-rose-600: #c92a2a;
+  --color-rose-500: #e03131;
+}
+:root[data-theme='ficha'] body {
+  background-image: linear-gradient(#dde5ec 1px, transparent 1px), linear-gradient(90deg, #dde5ec 1px, transparent 1px);
+  background-size: 18px 18px;
+}
+:root[data-theme='ficha'] [class*='shadow-['] { box-shadow: none !important; }
+:root[data-theme='ficha'] .border-2 { border-width: 1.5px; }
+:root[data-theme='ficha'] [class*='shadow-[4px_4px'] { border-color: var(--color-slate-900); }
+:root[data-theme='ficha'] h2,
+:root[data-theme='ficha'] h3 { font-family: 'IBM Plex Sans Condensed', 'IBM Plex Sans', sans-serif; }
+:root[data-theme='ficha'] .app-sidebar { background: rgb(245 248 250 / 0.94); }
+
+/* Botón de acción principal: usa el acento de cada tema */
+.btn-accent {
+  background: var(--accent) !important;
+  color: var(--accent-ink) !important;
+  border-color: var(--accent) !important;
+}
+:root:not([data-theme='taller']):not([data-theme='ficha']) .btn-accent { border-color: #0f172a !important; }
+
+/* Ocultar barra de scroll de las pestañas */
+.scrollbar-none { scrollbar-width: none; }
+.scrollbar-none::-webkit-scrollbar { display: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
 }

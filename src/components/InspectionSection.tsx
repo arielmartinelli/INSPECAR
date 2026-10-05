@@ -128,10 +128,10 @@ export const InspectionSection: FC<InspectionSectionProps> = ({
         </div>
       </div>
 
-      <div className="text-[11px] font-medium text-slate-500 bg-slate-100 p-2 mb-3 border border-slate-300 flex items-center gap-1.5">
-        <span className="font-bold text-slate-800">💡 Tip Facu:</span>
+      <p className="text-[11px] font-medium text-slate-600 bg-slate-100 p-2 mb-3 border border-slate-300">
+        <span className="font-bold text-slate-800">💡 Tip Facu: </span>
         <span>Si tocas B y R seguidos, se marca el punto intermedio <strong>B/R</strong> (mitad). Igual con R y M (<strong>R/M</strong>). Usá <strong>N/A</strong> si el auto no tiene ese elemento.</span>
-      </div>
+      </p>
 
       {/* Grid Table of items */}
       <div className="divide-y divide-slate-200 border-t border-b border-slate-300">

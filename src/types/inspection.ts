@@ -1,14 +1,52 @@
 export type ScoreValue = 'B' | 'B-R' | 'R' | 'R-M' | 'M' | 'NA' | null;
 export type YesNoValue = 'SI' | 'NO' | null;
 
+export type DamageView = 'lateral_izq' | 'lateral_der' | 'frente' | 'trasera' | 'techo';
+/** Reemp = pieza reemplazada (pedido de Facu: reemplaza a "Bollo", que ahora se marca como Dañado). */
+export type DamageType = 'D' | 'Rep' | 'Rayon' | 'Reemp';
+
 export interface DamageMarker {
   id: string;
-  view: 'lateral_izq' | 'lateral_der' | 'frente' | 'trasera' | 'techo';
+  view: DamageView;
   x: number; // percentage 0-100
   y: number; // percentage 0-100
-  type: 'D' | 'Rep' | 'Rayon' | 'Bollo';
+  type: DamageType;
   note?: string;
 }
+
+/** Configuración única de tipos de daño (app + PDF). */
+export const DAMAGE_TYPES: Record<DamageType, { label: string; short: string; color: string }> = {
+  D: { label: 'Dañado', short: 'D', color: '#e11d48' },
+  Rep: { label: 'Repintado', short: 'Rep', color: '#2563eb' },
+  Rayon: { label: 'Rayón / Raspón', short: 'Ray', color: '#d97706' },
+  Reemp: { label: 'Reemplazado', short: 'Rem', color: '#0d9488' }
+};
+
+/** Normaliza marcadores viejos: "Bollo" pasa a "Dañado". */
+export const normalizeMarkers = (markers: unknown): DamageMarker[] =>
+  Array.isArray(markers)
+    ? markers.map((m) => ({ ...m, type: m.type in DAMAGE_TYPES ? m.type : 'D' }) as DamageMarker)
+    : [];
+
+/** Secciones con observaciones propias (se juntan en la observación general del informe). */
+export type ObsSection = 'interior' | 'exterior' | 'mecanica' | 'accesorios' | 'carroceria';
+export const OBS_SECTION_LABEL: Record<ObsSection, string> = {
+  interior: 'Interior',
+  exterior: 'Exterior',
+  mecanica: 'Mecánica',
+  accesorios: 'Accesorios',
+  carroceria: 'Chapa y pintura'
+};
+
+/** Estado de seguimiento de cada inspección. */
+export type Estado = 'borrador' | 'finalizada' | 'entregada' | 'compro' | 'no_compro';
+export const ESTADOS: { id: Estado; label: string; tone: string }[] = [
+  { id: 'borrador', label: 'Borrador', tone: 'bg-slate-100 text-slate-700 border-slate-400' },
+  { id: 'finalizada', label: 'Finalizada', tone: 'bg-blue-50 text-blue-800 border-blue-500' },
+  { id: 'entregada', label: 'Entregada', tone: 'bg-amber-50 text-amber-900 border-amber-500' },
+  { id: 'compro', label: 'Compró', tone: 'bg-emerald-50 text-emerald-800 border-emerald-600' },
+  { id: 'no_compro', label: 'No compró', tone: 'bg-rose-50 text-rose-800 border-rose-500' }
+];
 
 export interface VehicleInfo {
   tipoVehiculo: string;
@@ -24,6 +62,7 @@ export interface VehicleInfo {
   fecha: string;
   itvVtv: 'SI' | 'NO' | '';
   clienteNombre?: string;
+  clienteDni?: string;
   clienteTelefono?: string;
 }
 
@@ -36,7 +75,11 @@ export interface InspectionData {
   mecanica: Record<string, ScoreValue>;
   accesorios: Record<string, YesNoValue>;
   damageMarkers: DamageMarker[];
+  /** Observaciones generales adicionales (además de las de cada sección). */
   observaciones: string;
+  obsSecciones?: Partial<Record<ObsSection, string>>;
+  estado?: Estado;
+  mantenimiento?: Mantenimiento;
   conclusionGeneral?: 'Recomendado' | 'Con reparaciones pendientes' | 'No recomendado' | 'A criterio del comprador' | '';
 }
 
@@ -131,3 +174,71 @@ export const ACCESORIOS_ITEMS = [
   'Balizas de emergencia',
   'Matafuegos'
 ];
+
+/** Junta las observaciones de cada sección + la general, en el orden del informe. */
+export const compileObservaciones = (d: InspectionData): { titulo: string; texto: string }[] => {
+  const out: { titulo: string; texto: string }[] = [];
+  (Object.keys(OBS_SECTION_LABEL) as ObsSection[]).forEach((k) => {
+    const t = d.obsSecciones?.[k]?.trim();
+    if (t) out.push({ titulo: OBS_SECTION_LABEL[k], texto: t });
+  });
+  if (d.observaciones?.trim()) out.push({ titulo: 'General', texto: d.observaciones.trim() });
+  return out;
+};
+
+/** Conteo B / R / M de todas las secciones calificadas. */
+export const scoreCounts = (d: InspectionData) => {
+  const all = [...Object.values(d.interior), ...Object.values(d.exterior), ...Object.values(d.mecanica)];
+  return {
+    b: all.filter((v) => v === 'B' || v === 'B-R').length,
+    r: all.filter((v) => v === 'R').length,
+    m: all.filter((v) => v === 'M' || v === 'R-M').length
+  };
+};
+
+// ── Informe de Mantenimiento Preventivo (servicio adicional) ──
+export type Plazo = 'corto' | 'mediano' | 'largo';
+
+export const PLAZOS: { id: Plazo; label: string; detalle: string; color: string }[] = [
+  { id: 'corto', label: 'Corto plazo', detalle: 'Inmediato · próximos 30 días o 1.000 km', color: '#dc2626' },
+  { id: 'mediano', label: 'Mediano plazo', detalle: 'De 1 a 6 meses · hasta 10.000 km', color: '#d97706' },
+  { id: 'largo', label: 'Largo plazo', detalle: 'De 6 a 12 meses · más de 10.000 km', color: '#059669' }
+];
+
+export interface MantenimientoItem {
+  id: string;
+  plazo: Plazo;
+  tarea: string;
+  detalle?: string;
+  costo?: string;
+}
+
+export interface Mantenimiento {
+  activo: boolean;
+  items: MantenimientoItem[];
+  notas?: string;
+}
+
+/**
+ * Sugiere tareas a partir de lo calificado: Malo y R/M → corto plazo, Regular → mediano, B/R → largo.
+ * Facu después ajusta el texto, el plazo y el costo.
+ */
+export const suggestMantenimiento = (d: InspectionData, interiorItems: string[]): MantenimientoItem[] => {
+  const out: MantenimientoItem[] = [];
+  const add = (items: string[], vals: Record<string, ScoreValue>, area: string) =>
+    items.forEach((item) => {
+      const v = vals[item];
+      const plazo: Plazo | null = v === 'M' || v === 'R-M' ? 'corto' : v === 'R' ? 'mediano' : v === 'B-R' ? 'largo' : null;
+      if (plazo)
+        out.push({
+          id: Math.random().toString(36).slice(2, 10),
+          plazo,
+          tarea: `${item}`,
+          detalle: `${area} · estado ${SCORE_LABEL[v as Exclude<ScoreValue, null>]}`
+        });
+    });
+  add(MECANICA_ITEMS, d.mecanica, 'Mecánica');
+  add(EXTERIOR_ITEMS, d.exterior, 'Exterior');
+  add(interiorItems, d.interior, 'Interior');
+  return out;
+};

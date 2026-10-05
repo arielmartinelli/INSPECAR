@@ -1,7 +1,7 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import type { InspectionData, DamageMarker, ScoreValue } from '../types/inspection';
-import { getInteriorItems, EXTERIOR_ITEMS, MECANICA_ITEMS, ACCESORIOS_ITEMS, SCORE_LABEL } from '../types/inspection';
+import { getInteriorItems, EXTERIOR_ITEMS, MECANICA_ITEMS, ACCESORIOS_ITEMS, SCORE_LABEL, DAMAGE_TYPES, compileObservaciones } from '../types/inspection';
 import { getBlueprintKey } from '../data/carData';
 
 const scoreText = (v: ScoreValue | undefined) => (v ? SCORE_LABEL[v] : '-');
@@ -28,12 +28,9 @@ const VIEW_TRANSLATIONS: Record<string, string> = {
   techo: 'Planta / Techo'
 };
 
-const TYPE_TRANSLATIONS: Record<string, { label: string; color: string }> = {
-  D: { label: 'Dañado (D)', color: '#e11d48' },
-  Rep: { label: 'Repintado (Rep)', color: '#2563eb' },
-  Rayon: { label: 'Rayón / Raspón', color: '#d97706' },
-  Bollo: { label: 'Bollo / Hundido', color: '#9333ea' }
-};
+const TYPE_TRANSLATIONS: Record<string, { label: string; color: string }> = Object.fromEntries(
+  Object.entries(DAMAGE_TYPES).map(([k, v]) => [k, { label: v.label, color: v.color }])
+);
 
 // Carga asíncrona de imagen para Canvas
 function loadImage(src: string): Promise<HTMLImageElement> {
@@ -140,6 +137,12 @@ async function generateVehicleBlueprintImage(
 
       if (img) {
         ctx.drawImage(img, drawX, drawY, drawW, drawH);
+      } else {
+        // p. ej. el furgón no tiene plano de techo
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = '600 14px helvetica, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('Vista no disponible para esta carrocería', vb.x + vb.w / 2, vb.y + vb.h / 2);
       }
 
       // Badge de título de la vista (Esquina superior izquierda)
@@ -320,6 +323,27 @@ export async function generateInspectionPDF(data: InspectionData): Promise<jsPDF
   // "SUV / Camioneta cerrada" se salía de la hoja: se muestra sólo el tipo principal
   const bodyShort = (data.vehicle.tipoVehiculo || '-').split(/[(/]/)[0].trim();
   doc.text(fitText(doc, bodyShort, pageWidth - 16 - 168), 168, currentY + 15.5);
+
+  // Fila 3: cliente (si se cargó)
+  const v = data.vehicle;
+  if (v.clienteNombre || v.clienteDni || v.clienteTelefono) {
+    doc.setDrawColor(15, 23, 42);
+    doc.setLineWidth(0.5);
+    doc.rect(14, currentY + 20, pageWidth - 28, 8);
+    doc.setFont('helvetica', 'bold');
+    doc.text('CLIENTE:', 18, currentY + 25.3);
+    doc.setFont('helvetica', 'normal');
+    doc.text(fitText(doc, v.clienteNombre || '-', 70), 36, currentY + 25.3);
+    doc.setFont('helvetica', 'bold');
+    doc.text('DNI:', 110, currentY + 25.3);
+    doc.setFont('helvetica', 'normal');
+    doc.text(v.clienteDni || '-', 119, currentY + 25.3);
+    doc.setFont('helvetica', 'bold');
+    doc.text('TEL:', 150, currentY + 25.3);
+    doc.setFont('helvetica', 'normal');
+    doc.text(fitText(doc, v.clienteTelefono || '-', pageWidth - 16 - 159), 159, currentY + 25.3);
+    currentY += 8;
+  }
 
   currentY += 24;
 
@@ -676,10 +700,13 @@ export async function generateInspectionPDF(data: InspectionData): Promise<jsPDF
   page2Y += 3.5;
 
   // El recuadro crece con el texto (antes tenía alto fijo y el texto largo se pisaba con el dictamen)
-  const obs = data.observaciones?.trim() || 'Sin observaciones mecánicas adicionales registradas durante la evaluación.';
+  // Observaciones de cada sección (Interior, Exterior, Mecánica…) + la general, juntas
+  const obsParts = compileObservaciones(data);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7.6);
-  const obsLines: string[] = doc.splitTextToSize(obs, pageWidth - 36);
+  const obsLines: string[] = obsParts.length
+    ? obsParts.flatMap((o) => doc.splitTextToSize(`${o.titulo.toUpperCase()}: ${o.texto}`, pageWidth - 36) as string[])
+    : (doc.splitTextToSize('Sin observaciones mecánicas adicionales registradas durante la evaluación.', pageWidth - 36) as string[]);
   const lineH = 3.3;
   const footerLimit = pageHeight - 16;
   let lineIdx = 0;

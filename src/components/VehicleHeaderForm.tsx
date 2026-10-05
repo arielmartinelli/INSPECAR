@@ -1,7 +1,7 @@
 import { useState, type FC, type ChangeEvent } from 'react';
 import type { VehicleInfo } from '../types/inspection';
 import { POPULAR_VEHICLES, VEHICLE_BODY_TYPES, FUEL_TYPES } from '../data/carData';
-import { Car, Hash, Calendar, Gauge, Fuel, ShieldCheck, Edit3, ListFilter } from 'lucide-react';
+import { User, Car, Hash, Calendar, Gauge, Fuel, ShieldCheck, Edit3, ListFilter } from 'lucide-react';
 
 const MAX_YEAR = new Date().getFullYear() + 1;
 
@@ -344,6 +344,33 @@ export const VehicleHeaderForm: FC<VehicleHeaderFormProps> = ({ vehicle, onChang
             <option value="SI">SÍ (Vigente)</option>
             <option value="NO">NO (Vencida o Sin VTV)</option>
           </select>
+        </div>
+      </div>
+
+      {/* Datos del cliente: permiten buscar y hacer seguimiento en Registros */}
+      <div className="mt-6 pt-5 border-t-2 border-slate-200">
+        <h3 className="flex items-center gap-2 text-sm font-black uppercase tracking-tight text-slate-900 mb-3">
+          <User className="w-4 h-4" aria-hidden /> Cliente
+        </h3>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div>
+            <label htmlFor="cli-nombre" className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">Nombre y apellido</label>
+            <input id="cli-nombre" type="text" autoComplete="off" value={vehicle.clienteNombre || ''}
+              onChange={(e) => onChange({ ...vehicle, clienteNombre: e.target.value })}
+              placeholder="Ej: Juan Pérez" className="w-full bg-slate-50 border-2 border-slate-900 rounded-none px-3.5 py-2.5 text-sm font-semibold text-slate-900 focus:outline-none focus:bg-white transition-colors" />
+          </div>
+          <div>
+            <label htmlFor="cli-dni" className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">DNI</label>
+            <input id="cli-dni" type="text" inputMode="numeric" autoComplete="off" value={vehicle.clienteDni || ''}
+              onChange={(e) => onChange({ ...vehicle, clienteDni: e.target.value.replace(/[^\d.]/g, '').slice(0, 12) })}
+              placeholder="Ej: 30.123.456" className="w-full bg-slate-50 border-2 border-slate-900 rounded-none px-3.5 py-2.5 text-sm font-semibold text-slate-900 focus:outline-none focus:bg-white transition-colors font-mono" />
+          </div>
+          <div>
+            <label htmlFor="cli-tel" className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">Teléfono / WhatsApp</label>
+            <input id="cli-tel" type="tel" inputMode="tel" autoComplete="off" value={vehicle.clienteTelefono || ''}
+              onChange={(e) => onChange({ ...vehicle, clienteTelefono: e.target.value })}
+              placeholder="Ej: 11 5555 5555" className="w-full bg-slate-50 border-2 border-slate-900 rounded-none px-3.5 py-2.5 text-sm font-semibold text-slate-900 focus:outline-none focus:bg-white transition-colors" />
+          </div>
         </div>
       </div>
     </div>
