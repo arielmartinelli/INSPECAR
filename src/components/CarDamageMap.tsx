@@ -131,7 +131,7 @@ export const CarDamageMap: FC<CarDamageMapProps> = ({
               type="button"
               title={v.label}
               onClick={() => setActiveView(v.id)}
-              className={`py-2 px-1 border-2 text-[10px] sm:text-xs font-mono font-bold uppercase tracking-tight whitespace-nowrap transition-all flex items-center justify-center gap-1 ${
+              className={`py-2.5 sm:py-3 px-1 sm:px-2 border-2 text-[11px] sm:text-xs font-mono font-black uppercase tracking-tight whitespace-nowrap transition-all flex items-center justify-center gap-1 ${
                 isActive
                   ? 'bg-slate-900 border-slate-900 text-white shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] scale-[1.02]'
                   : 'bg-white border-slate-300 text-slate-700 hover:border-slate-900'

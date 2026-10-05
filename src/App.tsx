@@ -177,18 +177,17 @@ export function App() {
       {/* Top Header Bar Sticky: Título INSPECAR + Botón PDF */}
       <header className="sticky top-0 z-40 bg-white border-b-2 border-slate-900 shadow-sm">
         <div className="max-w-3xl mx-auto px-3 sm:px-4 py-2.5 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 bg-slate-900 text-white flex items-center justify-center font-black text-sm shadow-[2px_2px_0px_0px_rgba(203,213,225,1)]">
-              IN
-            </div>
-            <div>
-              <h1 className="text-base font-black tracking-tight text-slate-900 leading-tight">
-                INSPECAR
-              </h1>
-              <span className="text-[10px] font-mono font-bold text-slate-500 uppercase tracking-widest block">
-                {data.vehicle.dominio ? data.vehicle.dominio : 'NUEVA INSPECCIÓN'}
+          <div className="flex items-center gap-2.5 sm:gap-3">
+            <img
+              src="/logo.png"
+              alt="INSPECAR Logo"
+              className="h-8 sm:h-10 w-auto object-contain"
+            />
+            {data.vehicle.dominio && (
+              <span className="hidden sm:inline-block bg-slate-100 border border-slate-900 px-2 py-0.5 text-[10px] font-mono font-black text-slate-800 tracking-wider">
+                {data.vehicle.dominio.toUpperCase()}
               </span>
-            </div>
+            )}
           </div>
 
           {/* Top Actions: Reset + Botón PDF Directo */}
@@ -196,7 +195,7 @@ export function App() {
             <button
               type="button"
               onClick={handleReset}
-              className="p-1.5 border-2 border-slate-300 text-slate-500 hover:text-rose-600 hover:border-slate-900 transition-colors"
+              className="p-2 border-2 border-slate-300 text-slate-500 hover:text-rose-600 hover:border-slate-900 transition-colors"
               title="Reiniciar planilla"
             >
               <RotateCcw className="w-4 h-4" />
@@ -206,7 +205,7 @@ export function App() {
               type="button"
               onClick={handleDownloadPDF}
               disabled={isGeneratingPdf}
-              className="flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white font-black px-4 py-2 text-xs uppercase tracking-wider border-2 border-slate-900 shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] active:translate-x-0.5 active:translate-y-0.5 transition-all"
+              className="flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white font-black px-4 py-2.5 text-xs uppercase tracking-wider border-2 border-slate-900 shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] active:translate-x-0.5 active:translate-y-0.5 transition-all"
             >
               <FileDown className="w-4 h-4" />
               <span>{isGeneratingPdf ? 'Creando...' : 'PDF'}</span>
@@ -215,8 +214,8 @@ export function App() {
         </div>
 
         {/* BARRA DE PASOS EN LÍNEA ARRIBA CON SCROLL HORIZONTAL */}
-        <div className="border-t border-slate-200 bg-slate-50 overflow-x-auto scrollbar-none px-2 py-1.5">
-          <div className="max-w-3xl mx-auto flex items-center gap-1.5 min-w-max">
+        <div className="border-t border-slate-200 bg-slate-50 overflow-x-auto scrollbar-none px-3 py-2 sm:py-2.5">
+          <div className="max-w-3xl mx-auto flex items-center gap-2 min-w-max">
             {tabs.map((tab) => {
               const active = activeTab === tab.id;
               const Icon = tab.icon;
@@ -226,13 +225,13 @@ export function App() {
                   key={tab.id}
                   type="button"
                   onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 border-2 text-xs font-mono font-bold uppercase tracking-wider whitespace-nowrap transition-all ${
+                  className={`flex items-center gap-2 px-3.5 sm:px-4 py-2 sm:py-2.5 border-2 text-xs sm:text-sm font-mono font-bold uppercase tracking-wider whitespace-nowrap transition-all ${
                     active
-                      ? 'bg-slate-900 border-slate-900 text-white shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] scale-[1.02]'
-                      : 'bg-white border-slate-300 text-slate-600 hover:border-slate-900 hover:text-slate-900'
+                      ? 'bg-slate-900 border-slate-900 text-white shadow-[3px_3px_0px_0px_rgba(15,23,42,1)] scale-[1.02]'
+                      : 'bg-white border-slate-300 text-slate-700 hover:border-slate-900 hover:text-slate-900'
                   }`}
                 >
-                  <Icon className="w-3.5 h-3.5" />
+                  <Icon className="w-4 h-4 sm:w-4.5 sm:h-4.5 shrink-0" />
                   <span>{tab.label}</span>
                 </button>
               );

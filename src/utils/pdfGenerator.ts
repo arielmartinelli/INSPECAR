@@ -41,6 +41,23 @@ function loadImage(src: string): Promise<HTMLImageElement> {
   });
 }
 
+// Obtener logo oficial de INSPECAR en Base64
+async function getLogoBase64(): Promise<string | null> {
+  if (typeof document === 'undefined') return null;
+  try {
+    const img = await loadImage('/logo-card.jpg');
+    const canvas = document.createElement('canvas');
+    canvas.width = img.width;
+    canvas.height = img.height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+    ctx.drawImage(img, 0, 0);
+    return canvas.toDataURL('image/jpeg', 0.95);
+  } catch {
+    return null;
+  }
+}
+
 // Genera un plano esquemático compuesto de 5 vistas en Canvas con los puntos marcados
 async function generateVehicleBlueprintImage(
   bodyType: string,
@@ -194,6 +211,12 @@ export async function generateInspectionPDF(data: InspectionData): Promise<jsPDF
   const vehicleTitle = `${brand || '-'} ${model || '-'} ${data.vehicle.version || ''}`.trim();
   const dominioFormatted = (data.vehicle.dominio || '-').toUpperCase();
 
+  // Carga paralela de Logo oficial y Diagrama CAD
+  const [logoImgData, blueprintImgData] = await Promise.all([
+    getLogoBase64(),
+    generateVehicleBlueprintImage(data.vehicle.tipoVehiculo, data.damageMarkers || [])
+  ]);
+
   // =========================================================================
   // ============================ PÁGINA 1 ===================================
   // =========================================================================
@@ -203,19 +226,24 @@ export async function generateInspectionPDF(data: InspectionData): Promise<jsPDF
   doc.setLineWidth(0.8);
   doc.rect(14, 10, pageWidth - 28, 20);
 
-  // Bloque Logo INSPECAR
-  doc.setFillColor(15, 23, 42);
-  doc.rect(14, 10, 50, 20, 'F');
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(18);
-  doc.setTextColor(255, 255, 255);
-  doc.text('INSPECAR', 18, 23);
+  // Logo Oficial INSPECAR en Header
+  if (logoImgData) {
+    doc.addImage(logoImgData, 'JPEG', 15, 11, 54, 18);
+  } else {
+    // Bloque Logo alternativo
+    doc.setFillColor(15, 23, 42);
+    doc.rect(14, 10, 50, 20, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(18);
+    doc.setTextColor(255, 255, 255);
+    doc.text('INSPECAR', 18, 23);
+  }
 
   // Subtítulo central
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(10.5);
+  doc.setFontSize(10);
   doc.setTextColor(15, 23, 42);
-  doc.text('PLANILLA DE INSPECCIÓN PRE-COMPRA', 68, 19);
+  doc.text('PLANILLA DE INSPECCIÓN PRE-COMPRA', 72, 19);
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(7.5);
@@ -514,12 +542,16 @@ export async function generateInspectionPDF(data: InspectionData): Promise<jsPDF
   doc.setLineWidth(0.8);
   doc.rect(14, 10, pageWidth - 28, 15);
 
-  doc.setFillColor(15, 23, 42);
-  doc.rect(14, 10, 42, 15, 'F');
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(15);
-  doc.setTextColor(255, 255, 255);
-  doc.text('INSPECAR', 17, 20);
+  if (logoImgData) {
+    doc.addImage(logoImgData, 'JPEG', 15, 10.5, 42, 14);
+  } else {
+    doc.setFillColor(15, 23, 42);
+    doc.rect(14, 10, 42, 15, 'F');
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(15);
+    doc.setTextColor(255, 255, 255);
+    doc.text('INSPECAR', 17, 20);
+  }
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9.5);
@@ -534,11 +566,6 @@ export async function generateInspectionPDF(data: InspectionData): Promise<jsPDF
   let page2Y = 28;
 
   // 1. ESQUEMA CAD DEL VEHÍCULO CON PUNTOS MARCADOS
-  const blueprintImgData = await generateVehicleBlueprintImage(
-    data.vehicle.tipoVehiculo,
-    data.damageMarkers || []
-  );
-
   const diagramHeight = 88;
   const diagramWidth = pageWidth - 28; // 182mm
 
