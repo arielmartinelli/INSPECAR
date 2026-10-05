@@ -8,6 +8,7 @@ interface InspectionSectionProps {
   items: string[];
   values: Record<string, ScoreValue>;
   onChange: (item: string, value: ScoreValue) => void;
+  onBulkChange: (updates: Record<string, ScoreValue>) => void;
   icon?: ReactNode;
 }
 
@@ -17,6 +18,7 @@ export const InspectionSection: FC<InspectionSectionProps> = ({
   items,
   values,
   onChange,
+  onBulkChange,
   icon
 }) => {
   const total = items.length;
@@ -25,10 +27,16 @@ export const InspectionSection: FC<InspectionSectionProps> = ({
   const rCount = items.filter((i) => values[i] === 'R').length;
   const mCount = items.filter((i) => values[i] === 'M' || values[i] === 'R-M').length;
 
-  const handleMarkAllGood = () => {
+  const pending = total - answered;
+
+  // Completa con B sólo los ítems vacíos: nunca pisa un R o M ya cargado.
+  // (Antes llamaba onChange 20 veces seguidas con el estado viejo y además borraba lo cargado.)
+  const handleMarkPendingGood = () => {
+    const updates: Record<string, ScoreValue> = {};
     items.forEach((item) => {
-      onChange(item, 'B');
+      if (values[item] == null) updates[item] = 'B';
     });
+    onBulkChange(updates);
   };
 
   // Helper when clicking B, R or M:
@@ -37,8 +45,13 @@ export const InspectionSection: FC<InspectionSectionProps> = ({
   // If user clicks M while R is active -> set 'R-M' (intermedio R/M)
   // If user clicks R while M is active -> set 'R-M'
   // If user clicks the active one -> toggle off (null)
-  const handleScoreClick = (item: string, target: 'B' | 'R' | 'M') => {
+  const handleScoreClick = (item: string, target: 'B' | 'R' | 'M' | 'NA') => {
     const current = values[item];
+
+    if (target === 'NA') {
+      onChange(item, current === 'NA' ? null : 'NA');
+      return;
+    }
 
     if (current === target) {
       // Toggle off
@@ -105,17 +118,19 @@ export const InspectionSection: FC<InspectionSectionProps> = ({
 
           <button
             type="button"
-            onClick={handleMarkAllGood}
-            className="text-xs bg-slate-900 hover:bg-slate-800 text-white px-3 py-1 font-bold uppercase tracking-wider transition-colors active:translate-x-0.5 active:translate-y-0.5"
+            onClick={handleMarkPendingGood}
+            disabled={pending === 0}
+            title="Marca como Bueno sólo los ítems que todavía no evaluaste"
+            className="text-xs bg-slate-900 hover:bg-slate-800 disabled:opacity-40 text-white px-3 py-1 font-bold uppercase tracking-wider transition-colors active:translate-x-0.5 active:translate-y-0.5"
           >
-            Todos B
+            Resto B{pending > 0 ? ` (${pending})` : ''}
           </button>
         </div>
       </div>
 
       <div className="text-[11px] font-medium text-slate-500 bg-slate-100 p-2 mb-3 border border-slate-300 flex items-center gap-1.5">
         <span className="font-bold text-slate-800">💡 Tip Facu:</span>
-        <span>Si tocas B y R seguidos, se marca el punto intermedio <strong>B/R</strong> (mitad). Igual con R y M (<strong>R/M</strong>).</span>
+        <span>Si tocas B y R seguidos, se marca el punto intermedio <strong>B/R</strong> (mitad). Igual con R y M (<strong>R/M</strong>). Usá <strong>N/A</strong> si el auto no tiene ese elemento.</span>
       </div>
 
       {/* Grid Table of items */}
@@ -127,6 +142,7 @@ export const InspectionSection: FC<InspectionSectionProps> = ({
           const isR = currentVal === 'R';
           const isRM = currentVal === 'R-M';
           const isM = currentVal === 'M';
+          const isNA = currentVal === 'NA';
 
           return (
             <div
@@ -139,7 +155,7 @@ export const InspectionSection: FC<InspectionSectionProps> = ({
                 <span className="text-[11px] font-mono font-bold text-slate-400 w-5 shrink-0">
                   {(idx + 1).toString().padStart(2, '0')}
                 </span>
-                <span className="text-xs sm:text-sm font-bold text-slate-900">
+                <span className={`text-xs sm:text-sm font-bold ${isNA ? 'text-slate-400 line-through' : 'text-slate-900'}`}>
                   {item}
                 </span>
                 {isBR && (
@@ -155,11 +171,13 @@ export const InspectionSection: FC<InspectionSectionProps> = ({
               </div>
 
               {/* Botonera adaptada a celular táctil amplio */}
-              <div className="grid grid-cols-3 gap-1.5 sm:flex sm:items-center sm:gap-2 self-stretch sm:self-auto">
+              <div role="group" aria-label={`Calificación: ${item}`} className="grid grid-cols-[1fr_1fr_1fr_auto] gap-1.5 sm:flex sm:items-center sm:gap-2 self-stretch sm:self-auto">
                 {/* Bueno */}
                 <button
                   type="button"
                   onClick={() => handleScoreClick(item, 'B')}
+                  aria-label="Bueno"
+                  aria-pressed={isB || isBR}
                   className={`h-11 sm:h-9 sm:w-14 border-2 font-mono font-black text-xs flex items-center justify-center gap-1 transition-all active:scale-95 ${
                     isB
                       ? 'bg-emerald-600 border-slate-900 text-white shadow-[2px_2px_0px_0px_rgba(15,23,42,1)]'
@@ -176,6 +194,8 @@ export const InspectionSection: FC<InspectionSectionProps> = ({
                 <button
                   type="button"
                   onClick={() => handleScoreClick(item, 'R')}
+                  aria-label="Regular"
+                  aria-pressed={isR || isBR || isRM}
                   className={`h-11 sm:h-9 sm:w-14 border-2 font-mono font-black text-xs flex items-center justify-center gap-1 transition-all active:scale-95 ${
                     isR
                       ? 'bg-amber-500 border-slate-900 text-slate-950 shadow-[2px_2px_0px_0px_rgba(15,23,42,1)]'
@@ -192,6 +212,8 @@ export const InspectionSection: FC<InspectionSectionProps> = ({
                 <button
                   type="button"
                   onClick={() => handleScoreClick(item, 'M')}
+                  aria-label="Malo"
+                  aria-pressed={isM || isRM}
                   className={`h-11 sm:h-9 sm:w-14 border-2 font-mono font-black text-xs flex items-center justify-center gap-1 transition-all active:scale-95 ${
                     isM
                       ? 'bg-rose-600 border-slate-900 text-white shadow-[2px_2px_0px_0px_rgba(15,23,42,1)]'
@@ -202,6 +224,21 @@ export const InspectionSection: FC<InspectionSectionProps> = ({
                 >
                   <X className="w-3.5 h-3.5 stroke-[3]" />
                   <span>M</span>
+                </button>
+
+                {/* No aplica */}
+                <button
+                  type="button"
+                  onClick={() => handleScoreClick(item, 'NA')}
+                  aria-label="No aplica"
+                  aria-pressed={isNA}
+                  className={`h-11 sm:h-9 px-2 sm:w-12 border-2 font-mono font-bold text-[10px] flex items-center justify-center transition-all active:scale-95 ${
+                    isNA
+                      ? 'bg-slate-700 border-slate-900 text-white'
+                      : 'bg-white border-dashed border-slate-300 text-slate-400 hover:border-slate-900'
+                  }`}
+                >
+                  N/A
                 </button>
               </div>
             </div>

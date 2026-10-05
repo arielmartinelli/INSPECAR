@@ -1,7 +1,7 @@
 import { useState, type FC, type MouseEvent } from 'react';
 import type { DamageMarker } from '../types/inspection';
 import { Trash2, MapPin, Info, RefreshCw, ChevronLeft, ChevronRight } from 'lucide-react';
-import { VEHICLE_BODY_TYPES } from '../data/carData';
+import { VEHICLE_BODY_TYPES, getBlueprintKey, blueprintSrc } from '../data/carData';
 
 interface CarDamageMapProps {
   markers: DamageMarker[];
@@ -32,24 +32,10 @@ export const CarDamageMap: FC<CarDamageMapProps> = ({
   const currentViewObj = views.find((v) => v.id === activeView) || views[0];
   const currentViewIdx = views.findIndex((v) => v.id === activeView);
 
-  // Normalizar tipo de carrocería
-  const norm = bodyType.toLowerCase();
-  const isPickup = norm.includes('pick') || norm.includes('caja');
-  const isSuv = norm.includes('suv') || norm.includes('camioneta') || norm.includes('cerrada') || norm.includes('crossover');
-  const isHatchback = !isSuv && (norm.includes('hatchback') || norm.includes('sin baúl') || norm.includes('sin baul'));
-  const isSedan = !isSuv && !isHatchback && (norm.includes('sedán') || norm.includes('sedan') || norm.includes('baúl') || norm.includes('baul'));
+  const currentImageSrc = blueprintSrc(getBlueprintKey(bodyType), activeView);
 
-  const vehicleKey = isPickup
-    ? 'pickup'
-    : isSuv
-    ? 'suv'
-    : isHatchback
-    ? 'hatchback'
-    : isSedan
-    ? 'sedan'
-    : 'sedan';
-
-  const currentImageSrc = `/blueprints/crops/${vehicleKey}_${activeView}.jpg`;
+  // Numeración global (#1, #2, #3…) igual a la del PDF, aunque los puntos estén en vistas distintas
+  const numberOf = (id: string) => markers.findIndex((m) => m.id === id) + 1;
 
   const typeConfig = {
     D: { label: 'D = Dañado', color: '#e11d48', badge: 'bg-rose-100 text-rose-800 border-rose-500' },
@@ -60,11 +46,11 @@ export const CarDamageMap: FC<CarDamageMapProps> = ({
 
   const handleImageClick = (e: MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
-    const x = Math.round(((e.clientX - rect.left) / rect.width) * 100);
-    const y = Math.round(((e.clientY - rect.top) / rect.height) * 100);
+    const x = Math.round(((e.clientX - rect.left) / rect.width) * 1000) / 10;
+    const y = Math.round(((e.clientY - rect.top) / rect.height) * 1000) / 10;
 
     const newMarker: DamageMarker = {
-      id: Math.random().toString(36).substring(2, 9),
+      id: crypto.randomUUID?.().slice(0, 8) ?? Math.random().toString(36).slice(2, 10),
       view: activeView,
       x,
       y,
@@ -74,6 +60,14 @@ export const CarDamageMap: FC<CarDamageMapProps> = ({
 
     onChange([...markers, newMarker]);
     setDamageNote('');
+  };
+
+  const handleClearAll = () => {
+    if (window.confirm(`¿Borrar los ${markers.length} puntos marcados en todas las vistas?`)) onChange([]);
+  };
+
+  const handleNoteChange = (id: string, note: string) => {
+    onChange(markers.map((m) => (m.id === id ? { ...m, note: note || undefined } : m)));
   };
 
   const handleRemoveMarker = (id: string) => {
@@ -227,7 +221,7 @@ export const CarDamageMap: FC<CarDamageMapProps> = ({
           />
 
           {/* Marcadores sobre la vista actual */}
-          {activeMarkers.map((m, idx) => {
+          {activeMarkers.map((m) => {
             const cfg = typeConfig[m.type] || typeConfig.D;
 
             return (
@@ -237,12 +231,9 @@ export const CarDamageMap: FC<CarDamageMapProps> = ({
                   left: `${m.x}%`,
                   top: `${m.y}%`
                 }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleRemoveMarker(m.id);
-                }}
-                className="absolute -translate-x-1/2 -translate-y-1/2 cursor-pointer group z-20"
-                title={`Punto #${idx + 1} (${m.type}) - Toca para borrar`}
+                onClick={(e) => e.stopPropagation()}
+                className="absolute -translate-x-1/2 -translate-y-1/2 cursor-default group z-20"
+                title={`Punto #${numberOf(m.id)} (${m.type})${m.note ? ' — ' + m.note : ''}. Para borrarlo usá la lista de abajo.`}
               >
                 <div
                   style={{ backgroundColor: cfg.color }}
@@ -250,7 +241,7 @@ export const CarDamageMap: FC<CarDamageMapProps> = ({
                 >
                   {m.type}
                   <span className="absolute -top-1 -right-1 w-4 h-4 bg-slate-950 text-white rounded-full text-[8px] flex items-center justify-center font-bold border border-white">
-                    {idx + 1}
+                    {numberOf(m.id)}
                   </span>
                 </div>
               </div>
@@ -266,7 +257,7 @@ export const CarDamageMap: FC<CarDamageMapProps> = ({
           {markers.length > 0 && (
             <button
               type="button"
-              onClick={() => onChange([])}
+              onClick={handleClearAll}
               className="text-rose-600 font-bold hover:underline text-xs flex items-center gap-1"
             >
               <RefreshCw className="w-3 h-3" />
@@ -281,28 +272,34 @@ export const CarDamageMap: FC<CarDamageMapProps> = ({
           </div>
         ) : (
           <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
-            {activeMarkers.map((m, idx) => (
+            {activeMarkers.map((m) => (
               <div
                 key={m.id}
                 className="flex items-center justify-between p-2 bg-slate-50 border border-slate-300 text-xs text-slate-800"
               >
-                <div className="flex items-center gap-2 min-w-0">
+                <div className="flex items-center gap-2 min-w-0 flex-1">
                   <span
                     className={`px-2 py-0.5 text-[10px] font-mono font-bold uppercase border ${
                       typeConfig[m.type]?.badge || 'bg-slate-200'
                     }`}
                   >
-                    #{idx + 1} {m.type}
+                    #{numberOf(m.id)} {m.type}
                   </span>
-                  <span className="font-semibold text-slate-700 truncate">
-                    {m.note || '(Punto en coordenadas ' + m.x + '%, ' + m.y + '%)'}
-                  </span>
+                  <input
+                    type="text"
+                    value={m.note ?? ''}
+                    onChange={(e) => handleNoteChange(m.id, e.target.value)}
+                    placeholder="Agregar nota…"
+                    aria-label={`Nota del punto ${numberOf(m.id)}`}
+                    className="min-w-0 flex-1 bg-white border border-slate-300 px-2 py-1 text-xs focus:outline-none focus:border-slate-900"
+                  />
                 </div>
                 <button
                   type="button"
                   onClick={() => handleRemoveMarker(m.id)}
                   className="p-1 hover:text-rose-600 text-slate-400 transition-colors ml-2"
                   title="Eliminar punto"
+                  aria-label={`Eliminar punto ${numberOf(m.id)}`}
                 >
                   <Trash2 className="w-4 h-4" />
                 </button>

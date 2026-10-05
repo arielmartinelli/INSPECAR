@@ -15,7 +15,6 @@ export const POPULAR_VEHICLES: CarDatabase = {
       'Pulse',
       'Fastback',
       'Strada',
-      'Fiorino',
       'Palio',
       'Siena',
       'Argo',
@@ -60,7 +59,6 @@ export const POPULAR_VEHICLES: CarDatabase = {
       'Yaris',
       'SW4',
       'RAV4',
-      'Hiace',
       'Land Cruiser'
     ],
     types: ['Pick-up', 'Sedán', 'Hatchback', 'SUV']
@@ -79,8 +77,7 @@ export const POPULAR_VEHICLES: CarDatabase = {
       'Maverick',
       'Kuga',
       'F-100',
-      'Mondeo',
-      'Transit'
+      'Mondeo'
     ],
     types: ['Pick-up', 'Hatchback', 'Sedán', 'SUV']
   },
@@ -89,7 +86,6 @@ export const POPULAR_VEHICLES: CarDatabase = {
       'Sandero',
       'Stepway',
       'Logan',
-      'Kangoo',
       'Duster',
       'Duster Oroch',
       'Alaskan',
@@ -99,7 +95,6 @@ export const POPULAR_VEHICLES: CarDatabase = {
       'Fluence',
       'Megane',
       'Captur',
-      'Master',
       'Symbol'
     ],
     types: ['Hatchback', 'Sedán', 'SUV', 'Pick-up']
@@ -277,6 +272,19 @@ export const VEHICLE_BODY_TYPES = [
   'Hatchback (Sin baúl)',
   'SUV / Camioneta cerrada'
 ];
+
+export type BlueprintKey = 'pickup' | 'sedan' | 'hatchback' | 'suv';
+
+/** Única fuente de verdad para elegir el plano según la carrocería (la usan la app y el PDF). */
+export const getBlueprintKey = (bodyType: string): BlueprintKey => {
+  const n = (bodyType || '').toLowerCase();
+  if (n.includes('pick') || n.includes('caja')) return 'pickup';
+  if (n.includes('suv') || n.includes('camioneta') || n.includes('cerrada')) return 'suv';
+  if (n.includes('hatch') || n.includes('sin baúl') || n.includes('sin baul')) return 'hatchback';
+  return 'sedan';
+};
+
+export const blueprintSrc = (key: BlueprintKey, view: string) => `/blueprints/crops/${key}_${view}.jpg`;
 
 export const FUEL_TYPES = [
   'Nafta',

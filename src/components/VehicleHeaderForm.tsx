@@ -3,6 +3,8 @@ import type { VehicleInfo } from '../types/inspection';
 import { POPULAR_VEHICLES, VEHICLE_BODY_TYPES, FUEL_TYPES } from '../data/carData';
 import { Car, Hash, Calendar, Gauge, Fuel, ShieldCheck, Edit3, ListFilter } from 'lucide-react';
 
+const MAX_YEAR = new Date().getFullYear() + 1;
+
 interface VehicleHeaderFormProps {
   vehicle: VehicleInfo;
   onChange: (updated: VehicleInfo) => void;
@@ -91,11 +93,11 @@ export const VehicleHeaderForm: FC<VehicleHeaderFormProps> = ({ vehicle, onChang
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
         {/* Tipo de Vehículo */}
         <div>
-          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5 flex items-center gap-1.5">
+          <label htmlFor="veh-f1" className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5 flex items-center gap-1.5">
             <Car className="w-3.5 h-3.5 text-slate-900" />
             Tipo de Carrocería
           </label>
-          <select
+          <select id="veh-f1"
             value={vehicle.tipoVehiculo}
             onChange={(e) => onChange({ ...vehicle, tipoVehiculo: e.target.value })}
             className="w-full bg-slate-50 border-2 border-slate-900 rounded-none px-3.5 py-2.5 text-sm font-semibold text-slate-900 focus:outline-none focus:bg-white focus:ring-2 focus:ring-slate-900 transition-colors"
@@ -111,7 +113,7 @@ export const VehicleHeaderForm: FC<VehicleHeaderFormProps> = ({ vehicle, onChang
         {/* Marca */}
         <div>
           <div className="flex items-center justify-between mb-1.5">
-            <label className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+            <label htmlFor="veh-f2" className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
               <Hash className="w-3.5 h-3.5 text-slate-900" />
               Marca
             </label>
@@ -123,7 +125,7 @@ export const VehicleHeaderForm: FC<VehicleHeaderFormProps> = ({ vehicle, onChang
                 if (nextMode) {
                   onChange({ ...vehicle, marca: 'OTRA', marcaPersonalizada: '' });
                 } else {
-                  onChange({ ...vehicle, marca: brands[0], marcaPersonalizada: undefined });
+                  onChange({ ...vehicle, marca: '', marcaPersonalizada: undefined, modelo: '', modeloPersonalizado: undefined });
                 }
               }}
               className="text-[11px] font-bold text-blue-700 hover:text-blue-900 underline flex items-center gap-1"
@@ -141,7 +143,7 @@ export const VehicleHeaderForm: FC<VehicleHeaderFormProps> = ({ vehicle, onChang
           </div>
 
           {!customBrandMode ? (
-            <select
+            <select id="veh-f2"
               value={vehicle.marca}
               onChange={handleBrandChange}
               className="w-full bg-slate-50 border-2 border-slate-900 rounded-none px-3.5 py-2.5 text-sm font-semibold text-slate-900 focus:outline-none focus:bg-white focus:ring-2 focus:ring-slate-900 transition-colors"
@@ -155,7 +157,7 @@ export const VehicleHeaderForm: FC<VehicleHeaderFormProps> = ({ vehicle, onChang
               <option value="OTRA">-- Otra Marca (manual) --</option>
             </select>
           ) : (
-            <input
+            <input id="veh-f2"
               type="text"
               placeholder="Escribe la marca..."
               value={vehicle.marcaPersonalizada || ''}
@@ -170,7 +172,7 @@ export const VehicleHeaderForm: FC<VehicleHeaderFormProps> = ({ vehicle, onChang
         {/* Modelo */}
         <div>
           <div className="flex items-center justify-between mb-1.5">
-            <label className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+            <label htmlFor="veh-f3" className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
               <Car className="w-3.5 h-3.5 text-slate-900" />
               Modelo
             </label>
@@ -200,7 +202,7 @@ export const VehicleHeaderForm: FC<VehicleHeaderFormProps> = ({ vehicle, onChang
           </div>
 
           {!customModelMode && availableModels.length > 0 ? (
-            <select
+            <select id="veh-f3"
               value={vehicle.modelo}
               onChange={handleModelChange}
               className="w-full bg-slate-50 border-2 border-slate-900 rounded-none px-3.5 py-2.5 text-sm font-semibold text-slate-900 focus:outline-none focus:bg-white focus:ring-2 focus:ring-slate-900 transition-colors"
@@ -214,7 +216,7 @@ export const VehicleHeaderForm: FC<VehicleHeaderFormProps> = ({ vehicle, onChang
               <option value="OTRO">-- Otro Modelo (manual) --</option>
             </select>
           ) : (
-            <input
+            <input id="veh-f3"
               type="text"
               placeholder="Ej: Toro Freedom, Hilux SRX, Cronos..."
               value={customModelMode ? vehicle.modeloPersonalizado || '' : vehicle.modelo}
@@ -232,10 +234,10 @@ export const VehicleHeaderForm: FC<VehicleHeaderFormProps> = ({ vehicle, onChang
 
         {/* Versión / Detalle */}
         <div>
-          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
+          <label htmlFor="veh-f4" className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
             Versión / Motor (Opcional)
           </label>
-          <input
+          <input id="veh-f4"
             type="text"
             placeholder="Ej: 2.0 4x4 AT9 / 1.6 16v"
             value={vehicle.version || ''}
@@ -246,15 +248,16 @@ export const VehicleHeaderForm: FC<VehicleHeaderFormProps> = ({ vehicle, onChang
 
         {/* Año */}
         <div>
-          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5 flex items-center gap-1.5">
+          <label htmlFor="veh-f5" className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5 flex items-center gap-1.5">
             <Calendar className="w-3.5 h-3.5 text-slate-900" />
             Año
           </label>
-          <input
+          <input id="veh-f5"
             type="number"
             min="1980"
-            max="2027"
+            max={MAX_YEAR}
             placeholder="Ej: 2018"
+            inputMode="numeric"
             value={vehicle.anio}
             onChange={(e) => onChange({ ...vehicle, anio: e.target.value })}
             className="w-full bg-slate-50 border-2 border-slate-900 rounded-none px-3.5 py-2.5 text-sm font-bold text-slate-900 focus:outline-none focus:bg-white transition-colors font-mono"
@@ -263,11 +266,11 @@ export const VehicleHeaderForm: FC<VehicleHeaderFormProps> = ({ vehicle, onChang
 
         {/* Dominio (Patente) */}
         <div>
-          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5 flex items-center gap-1.5">
+          <label htmlFor="veh-f6" className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5 flex items-center gap-1.5">
             <Hash className="w-3.5 h-3.5 text-slate-900" />
             Dominio (Patente)
           </label>
-          <input
+          <input id="veh-f6"
             type="text"
             placeholder="Ej: AC 073 DR"
             value={vehicle.dominio}
@@ -278,13 +281,15 @@ export const VehicleHeaderForm: FC<VehicleHeaderFormProps> = ({ vehicle, onChang
 
         {/* Kilómetros */}
         <div>
-          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5 flex items-center gap-1.5">
+          <label htmlFor="veh-f7" className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5 flex items-center gap-1.5">
             <Gauge className="w-3.5 h-3.5 text-slate-900" />
             Kilómetros
           </label>
-          <input
+          <input id="veh-f7"
             type="number"
             placeholder="Ej: 138600"
+            inputMode="numeric"
+            min="0"
             value={vehicle.kilometros}
             onChange={(e) => onChange({ ...vehicle, kilometros: e.target.value })}
             className="w-full bg-slate-50 border-2 border-slate-900 rounded-none px-3.5 py-2.5 text-sm font-bold text-slate-900 font-mono focus:outline-none focus:bg-white transition-colors"
@@ -293,11 +298,11 @@ export const VehicleHeaderForm: FC<VehicleHeaderFormProps> = ({ vehicle, onChang
 
         {/* Combustible */}
         <div>
-          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5 flex items-center gap-1.5">
+          <label htmlFor="veh-f8" className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5 flex items-center gap-1.5">
             <Fuel className="w-3.5 h-3.5 text-slate-900" />
             Combustible
           </label>
-          <select
+          <select id="veh-f8"
             value={vehicle.combustible}
             onChange={(e) => onChange({ ...vehicle, combustible: e.target.value })}
             className="w-full bg-slate-50 border-2 border-slate-900 rounded-none px-3.5 py-2.5 text-sm font-semibold text-slate-900 focus:outline-none focus:bg-white transition-colors"
@@ -312,11 +317,11 @@ export const VehicleHeaderForm: FC<VehicleHeaderFormProps> = ({ vehicle, onChang
 
         {/* Fecha */}
         <div>
-          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5 flex items-center gap-1.5">
+          <label htmlFor="veh-f9" className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5 flex items-center gap-1.5">
             <Calendar className="w-3.5 h-3.5 text-slate-900" />
             Fecha de Inspección
           </label>
-          <input
+          <input id="veh-f9"
             type="date"
             value={vehicle.fecha}
             onChange={(e) => onChange({ ...vehicle, fecha: e.target.value })}
@@ -326,11 +331,11 @@ export const VehicleHeaderForm: FC<VehicleHeaderFormProps> = ({ vehicle, onChang
 
         {/* ITV / VTV */}
         <div>
-          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5 flex items-center gap-1.5">
+          <label htmlFor="veh-f10" className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5 flex items-center gap-1.5">
             <ShieldCheck className="w-3.5 h-3.5 text-slate-900" />
             ITV / VTV Vigente
           </label>
-          <select
+          <select id="veh-f10"
             value={vehicle.itvVtv}
             onChange={(e) => onChange({ ...vehicle, itvVtv: e.target.value as 'SI' | 'NO' | '' })}
             className="w-full bg-slate-50 border-2 border-slate-900 rounded-none px-3.5 py-2.5 text-sm font-bold text-slate-900 focus:outline-none focus:bg-white transition-colors"

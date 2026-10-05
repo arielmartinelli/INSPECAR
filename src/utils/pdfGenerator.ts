@@ -1,7 +1,24 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import type { InspectionData, DamageMarker } from '../types/inspection';
-import { INTERIOR_ITEMS, EXTERIOR_ITEMS, MECANICA_ITEMS, ACCESORIOS_ITEMS } from '../types/inspection';
+import type { InspectionData, DamageMarker, ScoreValue } from '../types/inspection';
+import { getInteriorItems, EXTERIOR_ITEMS, MECANICA_ITEMS, ACCESORIOS_ITEMS, SCORE_LABEL } from '../types/inspection';
+import { getBlueprintKey } from '../data/carData';
+
+const scoreText = (v: ScoreValue | undefined) => (v ? SCORE_LABEL[v] : '-');
+
+/** dd/mm/aaaa a partir de aaaa-mm-dd */
+const formatDate = (iso: string) => {
+  const [y, m, d] = (iso || '').split('-');
+  return y && m && d ? `${d}/${m}/${y}` : iso || '-';
+};
+
+/** Recorta un texto con "…" para que no invada la columna de al lado. */
+const fitText = (doc: jsPDF, text: string, maxW: number) => {
+  if (doc.getTextWidth(text) <= maxW) return text;
+  let t = text;
+  while (t.length > 1 && doc.getTextWidth(t + '…') > maxW) t = t.slice(0, -1);
+  return t.trimEnd() + '…';
+};
 
 const VIEW_TRANSLATIONS: Record<string, string> = {
   lateral_der: 'Lateral Derecho',
@@ -17,16 +34,6 @@ const TYPE_TRANSLATIONS: Record<string, { label: string; color: string }> = {
   Rayon: { label: 'Rayón / Raspón', color: '#d97706' },
   Bollo: { label: 'Bollo / Hundido', color: '#9333ea' }
 };
-
-function getVehicleKey(bodyType: string): string {
-  const norm = (bodyType || '').toLowerCase();
-  const isPickup = norm.includes('pick') || norm.includes('caja');
-  const isSuv = norm.includes('suv') || norm.includes('camioneta') || norm.includes('cerrada') || norm.includes('crossover');
-  const isHatchback = !isSuv && (norm.includes('hatchback') || norm.includes('sin baúl') || norm.includes('sin baul'));
-  const isSedan = !isSuv && !isHatchback && (norm.includes('sedán') || norm.includes('sedan') || norm.includes('baúl') || norm.includes('baul'));
-
-  return isPickup ? 'pickup' : isSuv ? 'suv' : isHatchback ? 'hatchback' : isSedan ? 'sedan' : 'sedan';
-}
 
 // Carga asíncrona de imagen para Canvas
 function loadImage(src: string): Promise<HTMLImageElement> {
@@ -79,7 +86,7 @@ async function generateVehicleBlueprintImage(
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, width, height);
 
-    const vehicleKey = getVehicleKey(bodyType);
+    const vehicleKey = getBlueprintKey(bodyType);
 
     // Definición de las 5 cajas de vistas
     // Fila superior: Lateral Derecho y Lateral Izquierdo
@@ -136,6 +143,9 @@ async function generateVehicleBlueprintImage(
       }
 
       // Badge de título de la vista (Esquina superior izquierda)
+      // Reset de alineación: los marcadores dejan textAlign='center' y cortaban los títulos ("L IZQUIERDO", "RENTE")
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'alphabetic';
       ctx.fillStyle = '#0f172a';
       ctx.fillRect(vb.x, vb.y, 160, 22);
       ctx.font = 'bold 11px monospace';
@@ -187,6 +197,8 @@ async function generateVehicleBlueprintImage(
         ctx.font = 'bold 7px sans-serif';
         ctx.fillStyle = '#ffffff';
         ctx.fillText(vm.type.slice(0, 2), px + 10, py - 10);
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'alphabetic';
       }
     }
 
@@ -255,8 +267,8 @@ export async function generateInspectionPDF(data: InspectionData): Promise<jsPDF
   doc.setFontSize(8);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(15, 23, 42);
-  doc.text(`FECHA: ${data.vehicle.fecha || 'Sin fecha'}`, pageWidth - 18, 18, { align: 'right' });
-  doc.text(`VTV / ITV: ${data.vehicle.itvVtv || 'NO'}`, pageWidth - 18, 24, { align: 'right' });
+  doc.text(`FECHA: ${formatDate(data.vehicle.fecha)}`, pageWidth - 18, 18, { align: 'right' });
+  doc.text(`VTV / ITV: ${data.vehicle.itvVtv || '-'}`, pageWidth - 18, 24, { align: 'right' });
 
   // 1. FICHA TÉCNICA DEL VEHÍCULO
   let currentY = 34;
@@ -270,7 +282,7 @@ export async function generateInspectionPDF(data: InspectionData): Promise<jsPDF
   doc.setTextColor(15, 23, 42);
   doc.text('MARCA / MODELO:', 18, currentY + 6.5);
   doc.setFont('helvetica', 'normal');
-  doc.text(vehicleTitle, 50, currentY + 6.5);
+  doc.text(fitText(doc, vehicleTitle, 73), 50, currentY + 6.5);
 
   doc.setFont('helvetica', 'bold');
   doc.text('AÑO:', 125, currentY + 6.5);
@@ -280,7 +292,7 @@ export async function generateInspectionPDF(data: InspectionData): Promise<jsPDF
   doc.setFont('helvetica', 'bold');
   doc.text('DOMINIO:', 158, currentY + 6.5);
   doc.setFont('helvetica', 'normal');
-  doc.text(dominioFormatted, 174, currentY + 6.5);
+  doc.text(fitText(doc, dominioFormatted, pageWidth - 16 - 174), 174, currentY + 6.5);
 
   // Línea divisoria interna
   doc.setDrawColor(203, 213, 225);
@@ -291,7 +303,7 @@ export async function generateInspectionPDF(data: InspectionData): Promise<jsPDF
   doc.setFont('helvetica', 'bold');
   doc.text('COMBUSTIBLE:', 18, currentY + 15.5);
   doc.setFont('helvetica', 'normal');
-  doc.text(`${data.vehicle.combustible || '-'}`, 44, currentY + 15.5);
+  doc.text(fitText(doc, data.vehicle.combustible || '-', 48), 44, currentY + 15.5);
 
   doc.setFont('helvetica', 'bold');
   doc.text('KILÓMETROS:', 95, currentY + 15.5);
@@ -303,25 +315,28 @@ export async function generateInspectionPDF(data: InspectionData): Promise<jsPDF
   );
 
   doc.setFont('helvetica', 'bold');
-  doc.text('CARROCERÍA:', 152, currentY + 15.5);
+  doc.text('CARROCERÍA:', 145, currentY + 15.5);
   doc.setFont('helvetica', 'normal');
-  doc.text(`${data.vehicle.tipoVehiculo || '-'}`, 173, currentY + 15.5);
+  // "SUV / Camioneta cerrada" se salía de la hoja: se muestra sólo el tipo principal
+  const bodyShort = (data.vehicle.tipoVehiculo || '-').split(/[(/]/)[0].trim();
+  doc.text(fitText(doc, bodyShort, pageWidth - 16 - 168), 168, currentY + 15.5);
 
   currentY += 24;
 
   // 2. TABLA DE CONTROL DE 3 COLUMNAS (Interior, Exterior, Mecánica)
+  const INTERIOR_ITEMS = getInteriorItems(data.vehicle.tipoVehiculo); // sin "Caja de carga" si no es pick-up
   const maxRows = Math.max(INTERIOR_ITEMS.length, EXTERIOR_ITEMS.length, MECANICA_ITEMS.length);
   const tableBody: any[] = [];
 
   for (let i = 0; i < maxRows; i++) {
     const intItem = INTERIOR_ITEMS[i];
-    const intScore = intItem ? (data.interior[intItem] || '-') : '';
+    const intScore = intItem ? scoreText(data.interior[intItem]) : '';
 
     const extItem = EXTERIOR_ITEMS[i];
-    const extScore = extItem ? (data.exterior[extItem] || '-') : '';
+    const extScore = extItem ? scoreText(data.exterior[extItem]) : '';
 
     const mecItem = MECANICA_ITEMS[i];
-    const mecScore = mecItem ? (data.mecanica[mecItem] || '-') : '';
+    const mecScore = mecItem ? scoreText(data.mecanica[mecItem]) : '';
 
     tableBody.push([
       intItem || '',
@@ -374,18 +389,21 @@ export async function generateInspectionPDF(data: InspectionData): Promise<jsPDF
         if (val === 'B') {
           dataCell.cell.styles.textColor = [22, 101, 52];
           dataCell.cell.styles.fillColor = [220, 252, 231];
-        } else if (val === 'B-R') {
+        } else if (val === 'B/R') {
           dataCell.cell.styles.textColor = [161, 98, 7];
           dataCell.cell.styles.fillColor = [254, 249, 195];
         } else if (val === 'R') {
           dataCell.cell.styles.textColor = [161, 98, 7];
           dataCell.cell.styles.fillColor = [254, 240, 138];
-        } else if (val === 'R-M') {
+        } else if (val === 'R/M') {
           dataCell.cell.styles.textColor = [185, 28, 28];
           dataCell.cell.styles.fillColor = [254, 205, 211];
         } else if (val === 'M') {
           dataCell.cell.styles.textColor = [185, 28, 28];
           dataCell.cell.styles.fillColor = [254, 226, 226];
+        } else if (val === 'N/A') {
+          dataCell.cell.styles.textColor = [100, 116, 139];
+          dataCell.cell.styles.fillColor = [241, 245, 249];
         }
       }
     },
@@ -455,14 +473,15 @@ export async function generateInspectionPDF(data: InspectionData): Promise<jsPDF
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(30, 41, 59);
   doc.text('• B = Bueno (óptimo funcionamiento sin desgaste relevante)', rightColX + 4, currentY + 10);
-  doc.text('• B-R = Bueno a Regular  |  R = Regular (atención sugerida)', rightColX + 4, currentY + 14.5);
-  doc.text('• R-M = Regular a Malo  |  M = Malo (requiere reparación/cambio urgente)', rightColX + 4, currentY + 19);
+  doc.text('• B/R = Bueno a Regular  |  R = Regular (atención sugerida)', rightColX + 4, currentY + 14.5);
+  doc.text('• R/M = Regular a Malo  |  M = Malo (reparar/cambiar)  |  N/A = No aplica', rightColX + 4, currentY + 19);
 
   // Cuadro de Balance General (Buenos / Regulares / Malos)
+  // Sólo se cuentan los ítems visibles para esta carrocería
   const allScores = [
-    ...Object.values(data.interior),
-    ...Object.values(data.exterior),
-    ...Object.values(data.mecanica)
+    ...INTERIOR_ITEMS.map((i) => data.interior[i]),
+    ...EXTERIOR_ITEMS.map((i) => data.exterior[i]),
+    ...MECANICA_ITEMS.map((i) => data.mecanica[i])
   ];
   const countB = allScores.filter((s) => s === 'B' || s === 'B-R').length;
   const countR = allScores.filter((s) => s === 'R').length;
@@ -520,18 +539,6 @@ export async function generateInspectionPDF(data: InspectionData): Promise<jsPDF
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(6.8);
   doc.text('Plano CAD de Carrocería con puntos marcados y dictamen técnico.', rightColX + 4, bannerY + 8.5);
-
-  // Pie de página Página 1
-  const footerY1 = pageHeight - 10;
-  doc.setDrawColor(15, 23, 42);
-  doc.setLineWidth(0.3);
-  doc.line(14, footerY1 - 4, pageWidth - 14, footerY1 - 4);
-
-  doc.setFontSize(7);
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(71, 85, 105);
-  doc.text('INSPECAR - Diagnóstico Mecánico y Estructural Pre-Compra', 14, footerY1);
-  doc.text('Página 1 de 2', pageWidth - 14, footerY1, { align: 'right' });
 
   // =========================================================================
   // ============================ PÁGINA 2 ===================================
@@ -649,7 +656,7 @@ export async function generateInspectionPDF(data: InspectionData): Promise<jsPDF
     doc.setFont('helvetica', 'bold');
     doc.setFontSize(8);
     doc.setTextColor(22, 101, 52);
-    doc.text('✓ SIN DAÑOS REGISTRADOS:', 20, page2Y + 5.5);
+    doc.text('SIN DAÑOS REGISTRADOS:', 20, page2Y + 5.5);
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7.5);
     doc.text(
@@ -668,27 +675,43 @@ export async function generateInspectionPDF(data: InspectionData): Promise<jsPDF
   doc.text('OBSERVACIONES GENERALES DEL TÉCNICO EVALUADOR:', 14, page2Y + 1);
   page2Y += 3.5;
 
-  // Calculamos altura disponible para el recuadro de observaciones
-  // Dejamos 38mm para el Dictamen y Firma al final
-  const bottomSectionHeight = 38;
-  const footerMargin = 16;
-  const maxObsHeight = pageHeight - footerMargin - bottomSectionHeight - page2Y;
-  const obsBoxHeight = Math.max(22, Math.min(36, maxObsHeight));
-
-  doc.setDrawColor(15, 23, 42);
-  doc.setLineWidth(0.3);
-  doc.setFillColor(248, 250, 252);
-  doc.rect(14, page2Y, pageWidth - 28, obsBoxHeight, 'FD');
-
+  // El recuadro crece con el texto (antes tenía alto fijo y el texto largo se pisaba con el dictamen)
+  const obs = data.observaciones?.trim() || 'Sin observaciones mecánicas adicionales registradas durante la evaluación.';
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(7.2);
-  doc.setTextColor(15, 23, 42);
+  doc.setFontSize(7.6);
+  const obsLines: string[] = doc.splitTextToSize(obs, pageWidth - 36);
+  const lineH = 3.3;
+  const footerLimit = pageHeight - 16;
+  let lineIdx = 0;
+  while (lineIdx < obsLines.length) {
+    const available = footerLimit - page2Y - 6;
+    let fit = Math.max(1, Math.floor(available / lineH));
+    if (available < 15) {
+      doc.addPage();
+      page2Y = 16;
+      continue;
+    }
+    fit = Math.min(fit, obsLines.length - lineIdx);
+    const boxH = Math.max(22, fit * lineH + 6);
+    doc.setDrawColor(15, 23, 42);
+    doc.setLineWidth(0.3);
+    doc.setFillColor(248, 250, 252);
+    doc.rect(14, page2Y, pageWidth - 28, boxH, 'FD');
+    doc.setTextColor(15, 23, 42);
+    doc.text(obsLines.slice(lineIdx, lineIdx + fit), 18, page2Y + 5);
+    lineIdx += fit;
+    page2Y += boxH + 4;
+    if (lineIdx < obsLines.length) {
+      doc.addPage();
+      page2Y = 16;
+    }
+  }
 
-  const obs = data.observaciones || 'Sin observaciones mecánicas adicionales registradas durante la evaluación.';
-  const splitObs = doc.splitTextToSize(obs, pageWidth - 34);
-  doc.text(splitObs, 18, page2Y + 4.5);
-
-  page2Y += obsBoxHeight + 4;
+  // Si el dictamen y la firma no entran, pasan a una hoja nueva
+  if (page2Y + 26 > footerLimit) {
+    doc.addPage();
+    page2Y = 16;
+  }
 
   // 4. DICTAMEN FINAL & BLOQUE DE FIRMA
   const verdictWidth = 100;
@@ -704,7 +727,7 @@ export async function generateInspectionPDF(data: InspectionData): Promise<jsPDF
   doc.setTextColor(15, 23, 42);
   doc.text('DICTAMEN TÉCNICO PRE-COMPRA:', 18, page2Y + 5.5);
 
-  const verdict = data.conclusionGeneral || 'A criterio del comprador';
+  const verdict = data.conclusionGeneral || 'Sin dictamen cargado';
   let verdictColor: [number, number, number] = [15, 23, 42];
   let verdictBg: [number, number, number] = [241, 245, 249];
 
@@ -751,17 +774,20 @@ export async function generateInspectionPDF(data: InspectionData): Promise<jsPDF
   doc.setTextColor(100, 116, 139);
   doc.text('INSPECAR Diagnóstico Automotor', signX + signatureWidth / 2, page2Y + 21.5, { align: 'center' });
 
-  // Pie de página Página 2
-  const footerY2 = pageHeight - 10;
-  doc.setDrawColor(15, 23, 42);
-  doc.setLineWidth(0.3);
-  doc.line(14, footerY2 - 4, pageWidth - 14, footerY2 - 4);
-
-  doc.setFontSize(7);
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(71, 85, 105);
-  doc.text('INSPECAR - Diagnóstico Mecánico y Estructural Pre-Compra', 14, footerY2);
-  doc.text('Página 2 de 2', pageWidth - 14, footerY2, { align: 'right' });
+  // Pie de página en todas las hojas con numeración real (antes decía siempre "de 2")
+  const totalPages = doc.getNumberOfPages();
+  for (let p = 1; p <= totalPages; p++) {
+    doc.setPage(p);
+    const footerY = pageHeight - 10;
+    doc.setDrawColor(15, 23, 42);
+    doc.setLineWidth(0.3);
+    doc.line(14, footerY - 4, pageWidth - 14, footerY - 4);
+    doc.setFontSize(7);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(71, 85, 105);
+    doc.text(`INSPECAR - Diagnóstico Mecánico y Estructural Pre-Compra  ·  ${dominioFormatted}`, 14, footerY);
+    doc.text(`Página ${p} de ${totalPages}`, pageWidth - 14, footerY, { align: 'right' });
+  }
 
   return doc;
 }

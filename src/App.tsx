@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   type InspectionData,
-  INTERIOR_ITEMS,
+  getInteriorItems,
   EXTERIOR_ITEMS,
   MECANICA_ITEMS,
   ACCESORIOS_ITEMS,
@@ -12,7 +12,6 @@ import { VehicleHeaderForm } from './components/VehicleHeaderForm';
 import { InspectionSection } from './components/InspectionSection';
 import { AccessoriesSection } from './components/AccessoriesSection';
 import { CarDamageMap } from './components/CarDamageMap';
-import { generateInspectionPDF } from './utils/pdfGenerator';
 import {
   FileDown,
   RotateCcw,
@@ -23,13 +22,17 @@ import {
   Wrench,
   FileText,
   ChevronRight,
-  ChevronLeft
+  ChevronLeft,
+  Share2,
+  type LucideIcon
 } from 'lucide-react';
+import { VEHICLE_BODY_TYPES } from './data/carData';
 
 const STORAGE_KEY = 'inspecar_draft_v3';
 
 const getInitialData = (): InspectionData => {
-  const today = new Date().toISOString().split('T')[0];
+  // Fecha local (toISOString usa UTC y después de las 21 h en Argentina da el día siguiente)
+  const today = new Date().toLocaleDateString('en-CA');
   return {
     id: 'INSP-' + Date.now().toString(36).toUpperCase(),
     createdAt: new Date().toISOString(),
@@ -43,7 +46,9 @@ const getInitialData = (): InspectionData => {
       combustible: 'Nafta',
       kilometros: '',
       fecha: today,
-      itvVtv: 'NO'
+      itvVtv: '',
+      clienteNombre: '',
+      clienteTelefono: ''
     },
     interior: {},
     exterior: {},
@@ -51,38 +56,80 @@ const getInitialData = (): InspectionData => {
     accesorios: {},
     damageMarkers: [],
     observaciones: '',
-    conclusionGeneral: 'A criterio del comprador'
+    conclusionGeneral: ''
   };
 };
 
-export function App() {
-  const [data, setData] = useState<InspectionData>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) {
-        return JSON.parse(saved);
-      }
-    } catch (e) {
-      console.error(e);
+/** Lee el borrador guardado y lo adapta a la versión actual (ej: carrocerías que ya no existen). */
+const loadDraft = (): InspectionData => {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (!saved) return getInitialData();
+    const parsed = JSON.parse(saved) as Partial<InspectionData>;
+    const base = getInitialData();
+    const data: InspectionData = {
+      ...base,
+      ...parsed,
+      vehicle: { ...base.vehicle, ...(parsed.vehicle ?? {}) },
+      interior: parsed.interior ?? {},
+      exterior: parsed.exterior ?? {},
+      mecanica: parsed.mecanica ?? {},
+      accesorios: parsed.accesorios ?? {},
+      damageMarkers: Array.isArray(parsed.damageMarkers) ? parsed.damageMarkers : []
+    };
+    if (!VEHICLE_BODY_TYPES.includes(data.vehicle.tipoVehiculo)) {
+      data.vehicle.tipoVehiculo = base.vehicle.tipoVehiculo; // ej: borradores viejos con "Furgón / Utilitario"
     }
+    return data;
+  } catch (e) {
+    console.error(e);
     return getInitialData();
-  });
+  }
+};
+
+const buildFileName = (data: InspectionData) => {
+  const v = data.vehicle;
+  const brand = v.marca === 'OTRA' ? v.marcaPersonalizada : v.marca;
+  const model = v.modelo === 'OTRO' ? v.modeloPersonalizado : v.modelo;
+  return `INSPECAR-${(v.dominio || 'AUTO').toUpperCase()}-${brand || ''}-${model || ''}.pdf`
+    .replace(/\s+/g, '_')
+    .replace(/[\\/:*?"<>|]/g, '');
+};
+
+const canShareFiles = () => {
+  try {
+    return !!navigator.canShare?.({ files: [new File([''], 'x.pdf', { type: 'application/pdf' })] });
+  } catch {
+    return false;
+  }
+};
+
+export function App() {
+  const [data, setData] = useState<InspectionData>(loadDraft);
 
   const [activeTab, setActiveTab] = useState<'vehiculo' | 'interior' | 'exterior' | 'mecanica' | 'accesorios' | 'carroceria' | 'resumen'>('vehiculo');
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
-  const [saveToast, setSaveToast] = useState(false);
+  const [shareSupported] = useState(canShareFiles);
 
-  // Auto-save to localStorage
+  // Autoguardado con debounce (no escribe en cada tecla)
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-      setSaveToast(true);
-      const timer = setTimeout(() => setSaveToast(false), 2000);
-      return () => clearTimeout(timer);
-    } catch (e) {
-      console.error(e);
-    }
+    const timer = setTimeout(() => {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      } catch (e) {
+        console.error(e);
+      }
+    }, 300);
+    return () => clearTimeout(timer);
   }, [data]);
+
+  // Al cambiar de paso, volver arriba (en el celular quedaba scrolleado abajo)
+  useEffect(() => {
+    window.scrollTo({ top: 0 });
+  }, [activeTab]);
+
+  const interiorItems = getInteriorItems(data.vehicle.tipoVehiculo);
+  const sectionItems = { interior: interiorItems, exterior: EXTERIOR_ITEMS, mecanica: MECANICA_ITEMS };
 
   const handleScoreChange = (
     section: 'interior' | 'exterior' | 'mecanica',
@@ -98,6 +145,14 @@ export function App() {
     }));
   };
 
+  const handleScoreBulk = (section: 'interior' | 'exterior' | 'mecanica', updates: Record<string, ScoreValue>) => {
+    setData((prev) => ({ ...prev, [section]: { ...prev[section], ...updates } }));
+  };
+
+  const handleAccessoryBulk = (updates: Record<string, YesNoValue>) => {
+    setData((prev) => ({ ...prev, accesorios: { ...prev.accesorios, ...updates } }));
+  };
+
   const handleAccessoryChange = (item: string, value: YesNoValue) => {
     setData((prev) => ({
       ...prev,
@@ -108,17 +163,34 @@ export function App() {
     }));
   };
 
+  // jsPDF pesa ~400 KB: se descarga recién cuando se pide el PDF, así la app abre más rápido.
+  const buildPdf = async () => {
+    const { generateInspectionPDF } = await import('./utils/pdfGenerator');
+    return generateInspectionPDF(data);
+  };
+
   const handleDownloadPDF = async () => {
     setIsGeneratingPdf(true);
     try {
-      const doc = await generateInspectionPDF(data);
-      const brand = data.vehicle.marca === 'OTRA' ? data.vehicle.marcaPersonalizada : data.vehicle.marca;
-      const model = data.vehicle.modelo === 'OTRO' ? data.vehicle.modeloPersonalizado : data.vehicle.modelo;
-      const filename = `INSPECAR-${(data.vehicle.dominio || 'AUTO').toUpperCase()}-${(brand || '')}-${(model || '')}.pdf`.replace(/\s+/g, '_');
-      doc.save(filename);
+      const doc = await buildPdf();
+      doc.save(buildFileName(data));
     } catch (error) {
       console.error('Error generating PDF:', error);
-      alert('Hubo un error al generar el PDF. Verifica los datos.');
+      alert('Hubo un error al generar el PDF. Verificá los datos.');
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  };
+
+  // Compartir el PDF directo (WhatsApp, mail, etc.) en celulares compatibles
+  const handleSharePDF = async () => {
+    setIsGeneratingPdf(true);
+    try {
+      const doc = await buildPdf();
+      const file = new File([doc.output('blob')], buildFileName(data), { type: 'application/pdf' });
+      await navigator.share({ files: [file], title: 'Informe INSPECAR' });
+    } catch (error) {
+      if ((error as Error)?.name !== 'AbortError') console.error(error);
     } finally {
       setIsGeneratingPdf(false);
     }
@@ -138,21 +210,21 @@ export function App() {
     }
   };
 
-  // Quick stats
-  const countCategory = (cat: 'interior' | 'exterior' | 'mecanica', score: 'B' | 'R' | 'M') => {
-    return Object.values(data[cat]).filter((val) => {
-      if (score === 'B') return val === 'B' || val === 'B-R';
-      if (score === 'R') return val === 'R';
-      if (score === 'M') return val === 'M' || val === 'R-M';
-      return false;
-    }).length;
-  };
+  // Totales sólo sobre los ítems visibles (ej: "Caja de carga" no cuenta en un sedán)
+  let totalB = 0, totalR = 0, totalM = 0;
+  const pendingBySection = { interior: 0, exterior: 0, mecanica: 0 };
+  (Object.keys(sectionItems) as (keyof typeof sectionItems)[]).forEach((sec) => {
+    sectionItems[sec].forEach((item) => {
+      const v = data[sec][item];
+      if (v === 'B' || v === 'B-R') totalB++;
+      else if (v === 'R') totalR++;
+      else if (v === 'M' || v === 'R-M') totalM++;
+      else if (v == null) pendingBySection[sec]++;
+    });
+  });
+  const totalPending = pendingBySection.interior + pendingBySection.exterior + pendingBySection.mecanica;
 
-  const totalB = countCategory('interior', 'B') + countCategory('exterior', 'B') + countCategory('mecanica', 'B');
-  const totalR = countCategory('interior', 'R') + countCategory('exterior', 'R') + countCategory('mecanica', 'R');
-  const totalM = countCategory('interior', 'M') + countCategory('exterior', 'M') + countCategory('mecanica', 'M');
-
-  const tabs: { id: typeof activeTab; step: string; label: string; icon: any }[] = [
+  const tabs: { id: typeof activeTab; step: string; label: string; icon: LucideIcon }[] = [
     { id: 'vehiculo', step: '01', label: '1. Vehículo', icon: Car },
     { id: 'interior', step: '02', label: '2. Interior', icon: Armchair },
     { id: 'exterior', step: '03', label: '3. Exterior', icon: Car },
@@ -186,6 +258,7 @@ export function App() {
               onClick={handleReset}
               className="p-2 border-2 border-slate-300 text-slate-500 hover:text-rose-600 hover:border-slate-900 transition-colors"
               title="Reiniciar planilla"
+              aria-label="Reiniciar planilla (nueva inspección)"
             >
               <RotateCcw className="w-4 h-4" />
             </button>
@@ -194,7 +267,7 @@ export function App() {
               type="button"
               onClick={handleDownloadPDF}
               disabled={isGeneratingPdf}
-              className="flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white font-black px-4 py-2.5 text-xs uppercase tracking-wider border-2 border-slate-900 shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] active:translate-x-0.5 active:translate-y-0.5 transition-all"
+              className="flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 disabled:opacity-60 text-white font-black px-4 py-2.5 text-xs uppercase tracking-wider border-2 border-slate-900 shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] active:translate-x-0.5 active:translate-y-0.5 transition-all"
             >
               <FileDown className="w-4 h-4" />
               <span>{isGeneratingPdf ? 'Creando...' : 'PDF'}</span>
@@ -236,7 +309,6 @@ export function App() {
           <div className="flex items-center gap-1.5">
             <span className="w-2 h-2 bg-emerald-600 inline-block" />
             <span>Auto guardado</span>
-            {saveToast && <span className="text-emerald-700 font-bold">✓</span>}
           </div>
           <span className="font-bold text-slate-600">
             Paso {tabs[currentTabIndex].step} de 07: {tabs[currentTabIndex].label}
@@ -247,7 +319,7 @@ export function App() {
         {activeTab === 'vehiculo' && (
           <VehicleHeaderForm
             vehicle={data.vehicle}
-            onChange={(updated) => setData({ ...data, vehicle: updated })}
+            onChange={(updated) => setData((prev) => ({ ...prev, vehicle: updated }))}
           />
         )}
 
@@ -256,9 +328,10 @@ export function App() {
           <InspectionSection
             title="Puntos de Control: Interior"
             stepNumber="02"
-            items={INTERIOR_ITEMS}
+            items={interiorItems}
             values={data.interior}
             onChange={(item, val) => handleScoreChange('interior', item, val)}
+            onBulkChange={(updates) => handleScoreBulk('interior', updates)}
             icon={<Armchair className="w-5 h-5 text-slate-900" />}
           />
         )}
@@ -271,6 +344,7 @@ export function App() {
             items={EXTERIOR_ITEMS}
             values={data.exterior}
             onChange={(item, val) => handleScoreChange('exterior', item, val)}
+            onBulkChange={(updates) => handleScoreBulk('exterior', updates)}
             icon={<Car className="w-5 h-5 text-slate-900" />}
           />
         )}
@@ -283,6 +357,7 @@ export function App() {
             items={MECANICA_ITEMS}
             values={data.mecanica}
             onChange={(item, val) => handleScoreChange('mecanica', item, val)}
+            onBulkChange={(updates) => handleScoreBulk('mecanica', updates)}
             icon={<Wrench className="w-5 h-5 text-slate-900" />}
           />
         )}
@@ -293,6 +368,7 @@ export function App() {
             items={ACCESORIOS_ITEMS}
             values={data.accesorios}
             onChange={handleAccessoryChange}
+            onBulkChange={handleAccessoryBulk}
           />
         )}
 
@@ -307,7 +383,7 @@ export function App() {
                 vehicle: { ...prev.vehicle, tipoVehiculo: newType }
               }))
             }
-            onChange={(markers) => setData({ ...data, damageMarkers: markers })}
+            onChange={(markers) => setData((prev) => ({ ...prev, damageMarkers: markers }))}
           />
         )}
 
@@ -333,18 +409,38 @@ export function App() {
                   <div className="text-[10px] font-bold uppercase text-rose-900">Malos</div>
                 </div>
               </div>
+
+              {totalPending > 0 && (
+                <div className="mt-3 border-2 border-amber-500 bg-amber-50 p-2.5 text-xs text-amber-900">
+                  <strong>Faltan {totalPending} ítems sin evaluar:</strong>{' '}
+                  {(Object.keys(pendingBySection) as (keyof typeof pendingBySection)[])
+                    .filter((sec) => pendingBySection[sec] > 0)
+                    .map((sec, i, arr) => (
+                      <span key={sec}>
+                        <button type="button" className="underline font-bold" onClick={() => setActiveTab(sec)}>
+                          {sec === 'interior' ? 'Interior' : sec === 'exterior' ? 'Exterior' : 'Mecánica'} ({pendingBySection[sec]})
+                        </button>
+                        {i < arr.length - 1 ? ' · ' : ''}
+                      </span>
+                    ))}
+                </div>
+              )}
             </div>
 
             {/* Dictamen */}
             <div className="bg-white border-2 border-slate-900 shadow-[4px_4px_0px_0px_rgba(15,23,42,1)] p-4">
-              <label className="block text-xs font-black uppercase tracking-wider text-slate-900 mb-2">
+              <label htmlFor="dictamen" className="block text-xs font-black uppercase tracking-wider text-slate-900 mb-2">
                 Dictamen Final Pre-Compra
               </label>
               <select
+                id="dictamen"
                 value={data.conclusionGeneral || ''}
-                onChange={(e) => setData({ ...data, conclusionGeneral: e.target.value as any })}
+                onChange={(e) =>
+                  setData((prev) => ({ ...prev, conclusionGeneral: e.target.value as InspectionData['conclusionGeneral'] }))
+                }
                 className="w-full bg-slate-50 border-2 border-slate-900 px-3 py-2.5 text-xs font-bold text-slate-900 focus:outline-none focus:bg-white"
               >
+                <option value="">— Elegir dictamen —</option>
                 <option value="Recomendado">🟢 Recomendado (Buen estado general)</option>
                 <option value="Con reparaciones pendientes">🟡 Recomendado con reparaciones / mantenimiento a considerar</option>
                 <option value="No recomendado">🔴 No recomendado (Riesgos mecánicos severos)</option>
@@ -354,23 +450,36 @@ export function App() {
 
             {/* Observaciones */}
             <div className="bg-white border-2 border-slate-900 shadow-[4px_4px_0px_0px_rgba(15,23,42,1)] p-4">
-              <label className="block text-xs font-black uppercase tracking-wider text-slate-900 mb-2">
+              <label htmlFor="observaciones" className="block text-xs font-black uppercase tracking-wider text-slate-900 mb-2">
                 Observaciones Detalladas
               </label>
               <textarea
-                rows={5}
+                id="observaciones"
+                rows={6}
                 value={data.observaciones}
-                onChange={(e) => setData({ ...data, observaciones: e.target.value })}
+                onChange={(e) => setData((prev) => ({ ...prev, observaciones: e.target.value }))}
                 placeholder="Escribe el reporte técnico detallado..."
-                className="w-full bg-slate-50 border-2 border-slate-900 p-3 text-xs font-semibold text-slate-900 focus:outline-none focus:bg-white leading-relaxed"
+                className="w-full bg-slate-50 border-2 border-slate-900 p-3 text-sm font-medium text-slate-900 focus:outline-none focus:bg-white leading-relaxed"
               />
             </div>
+
+            {shareSupported && (
+              <button
+                type="button"
+                onClick={handleSharePDF}
+                disabled={isGeneratingPdf}
+                className="w-full h-12 border-2 border-slate-900 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-black text-sm uppercase flex items-center justify-center gap-2 shadow-[3px_3px_0px_0px_rgba(15,23,42,1)]"
+              >
+                <Share2 className="w-4 h-4" aria-hidden />
+                Compartir PDF (WhatsApp, mail…)
+              </button>
+            )}
           </div>
         )}
       </main>
 
       {/* BARRA INFERIOR FIJA: VOLVER + RESUMEN EN EL MEDIO + SIGUIENTE */}
-      <div className="fixed bottom-0 inset-x-0 z-50 bg-white/95 backdrop-blur-md border-t-2 border-slate-900 p-2 sm:p-3 shadow-[0_-4px_10px_rgba(15,23,42,0.08)]">
+      <div className="fixed bottom-0 inset-x-0 z-50 bg-white/95 backdrop-blur-md border-t-2 border-slate-900 p-2 sm:p-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] shadow-[0_-4px_10px_rgba(15,23,42,0.08)]">
         <div className="max-w-lg mx-auto flex items-center justify-between gap-2">
           {/* Botón Volver */}
           {prevTab ? (
@@ -411,7 +520,7 @@ export function App() {
               className="h-11 px-4 border-2 border-slate-900 bg-slate-900 hover:bg-slate-800 text-white font-black text-xs uppercase font-mono flex items-center gap-1.5 active:scale-95 shadow-[2px_2px_0px_0px_rgba(15,23,42,1)] transition-all shrink-0"
             >
               <FileDown className="w-4 h-4" />
-              <span>PDF Final</span>
+              <span>{isGeneratingPdf ? 'Creando...' : 'PDF Final'}</span>
             </button>
           )}
         </div>

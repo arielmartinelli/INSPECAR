@@ -1,4 +1,4 @@
-export type ScoreValue = 'B' | 'B-R' | 'R' | 'R-M' | 'M' | null;
+export type ScoreValue = 'B' | 'B-R' | 'R' | 'R-M' | 'M' | 'NA' | null;
 export type YesNoValue = 'SI' | 'NO' | null;
 
 export interface DamageMarker {
@@ -37,7 +37,7 @@ export interface InspectionData {
   accesorios: Record<string, YesNoValue>;
   damageMarkers: DamageMarker[];
   observaciones: string;
-  conclusionGeneral?: 'Recomendado' | 'Con reparaciones pendientes' | 'No recomendado' | 'A criterio del comprador';
+  conclusionGeneral?: 'Recomendado' | 'Con reparaciones pendientes' | 'No recomendado' | 'A criterio del comprador' | '';
 }
 
 export const INTERIOR_ITEMS = [
@@ -64,6 +64,24 @@ export const INTERIOR_ITEMS = [
   'Caja de carga',
   'Tapa Caja de carga'
 ];
+
+/** Ítems que sólo aplican a pick-ups (se ocultan en sedán, hatchback y SUV). */
+export const PICKUP_ONLY_ITEMS = ['Caja de carga', 'Tapa Caja de carga'];
+
+export const isPickupBody = (tipo: string) => /pick|caja/i.test(tipo || '');
+
+export const getInteriorItems = (tipoVehiculo: string) =>
+  isPickupBody(tipoVehiculo) ? INTERIOR_ITEMS : INTERIOR_ITEMS.filter((i) => !PICKUP_ONLY_ITEMS.includes(i));
+
+/** Texto a mostrar para cada calificación (app y PDF). */
+export const SCORE_LABEL: Record<Exclude<ScoreValue, null>, string> = {
+  B: 'B',
+  'B-R': 'B/R',
+  R: 'R',
+  'R-M': 'R/M',
+  M: 'M',
+  NA: 'N/A'
+};
 
 export const EXTERIOR_ITEMS = [
   'Estado rueda delantera izquierda',

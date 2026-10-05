@@ -6,15 +6,19 @@ interface AccessoriesSectionProps {
   items: string[];
   values: Record<string, YesNoValue>;
   onChange: (item: string, value: YesNoValue) => void;
+  onBulkChange: (updates: Record<string, YesNoValue>) => void;
 }
 
 export const AccessoriesSection: FC<AccessoriesSectionProps> = ({
   items,
   values,
-  onChange
+  onChange,
+  onBulkChange
 }) => {
-  const handleMarkAllYes = () => {
-    items.forEach((item) => onChange(item, 'SI'));
+  const pending = items.filter((i) => values[i] == null);
+  // Sólo completa los pendientes: no pisa un NO ya marcado.
+  const handleMarkPendingYes = () => {
+    onBulkChange(Object.fromEntries(pending.map((i) => [i, 'SI' as YesNoValue])));
   };
 
   return (
@@ -39,10 +43,11 @@ export const AccessoriesSection: FC<AccessoriesSectionProps> = ({
 
         <button
           type="button"
-          onClick={handleMarkAllYes}
-          className="text-xs bg-slate-900 hover:bg-slate-800 text-white px-3.5 py-1.5 font-bold uppercase tracking-wider transition-colors self-start sm:self-auto active:translate-x-0.5 active:translate-y-0.5"
+          onClick={handleMarkPendingYes}
+          disabled={pending.length === 0}
+          className="text-xs bg-slate-900 hover:bg-slate-800 text-white px-3.5 py-1.5 font-bold uppercase tracking-wider transition-colors disabled:opacity-40 self-start sm:self-auto active:translate-x-0.5 active:translate-y-0.5"
         >
-          Todos SÍ
+          Resto SÍ
         </button>
       </div>
 
@@ -65,7 +70,9 @@ export const AccessoriesSection: FC<AccessoriesSectionProps> = ({
                 <button
                   type="button"
                   onClick={() => onChange(item, currentVal === 'SI' ? null : 'SI')}
-                  className={`w-14 h-8 border-2 font-mono font-bold text-xs flex items-center justify-center gap-1 transition-all ${
+                  aria-pressed={currentVal === 'SI'}
+                  aria-label={`${item}: sí`}
+                  className={`w-16 h-10 border-2 font-mono font-bold text-xs flex items-center justify-center gap-1 transition-all ${
                     currentVal === 'SI'
                       ? 'bg-emerald-600 border-slate-900 text-white shadow-[2px_2px_0px_0px_rgba(15,23,42,1)]'
                       : 'bg-white border-slate-300 text-slate-500 hover:border-slate-900 hover:text-emerald-700'
@@ -78,7 +85,9 @@ export const AccessoriesSection: FC<AccessoriesSectionProps> = ({
                 <button
                   type="button"
                   onClick={() => onChange(item, currentVal === 'NO' ? null : 'NO')}
-                  className={`w-14 h-8 border-2 font-mono font-bold text-xs flex items-center justify-center gap-1 transition-all ${
+                  aria-pressed={currentVal === 'NO'}
+                  aria-label={`${item}: no`}
+                  className={`w-16 h-10 border-2 font-mono font-bold text-xs flex items-center justify-center gap-1 transition-all ${
                     currentVal === 'NO'
                       ? 'bg-rose-600 border-slate-900 text-white shadow-[2px_2px_0px_0px_rgba(15,23,42,1)]'
                       : 'bg-white border-slate-300 text-slate-500 hover:border-slate-900 hover:text-rose-700'
