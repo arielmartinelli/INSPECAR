@@ -294,38 +294,36 @@ export const VEHICLE_BODY_TYPES = [
   'Sedán (Con baúl)',
   'Hatchback (Sin baúl)',
   'SUV / Camioneta cerrada',
-  'Coupé (2 puertas)',
+  'Coupé (1 puerta por lado)',
   'Furgón / Utilitario'
 ];
 
-export type BlueprintKey = 'pickup' | 'sedan' | 'hatchback' | 'suv' | 'furgon';
+export type BlueprintKey = 'pickup' | 'sedan' | 'hatchback' | 'suv' | 'coupe' | 'furgon';
 export type BlueprintView = 'lateral_der' | 'lateral_izq' | 'frente' | 'trasera' | 'techo';
 
 const ALL_VIEWS: BlueprintView[] = ['lateral_der', 'lateral_izq', 'frente', 'trasera', 'techo'];
 
-/** Vistas que tienen plano para cada carrocería (el furgón no tiene vista de techo). */
+/** Vistas que tienen plano para cada carrocería. */
 export const BLUEPRINT_VIEWS: Record<BlueprintKey, BlueprintView[]> = {
   pickup: ALL_VIEWS,
   sedan: ALL_VIEWS,
   hatchback: ALL_VIEWS,
   suv: ALL_VIEWS,
-  furgon: ['lateral_der', 'lateral_izq', 'frente', 'trasera']
+  coupe: ALL_VIEWS,
+  furgon: ALL_VIEWS
 };
 
-/**
- * Única fuente de verdad para elegir el plano según la carrocería (la usan la app y el PDF).
- * Coupé usa por ahora la silueta del sedán hasta tener un plano propio.
- */
+/** Única fuente de verdad para elegir el plano según la carrocería (la usan la app y el PDF). */
 export const getBlueprintKey = (bodyType: string): BlueprintKey => {
   const n = (bodyType || '').toLowerCase();
   if (n.includes('pick') || n.includes('caja')) return 'pickup';
   if (n.includes('furg') || n.includes('utilit')) return 'furgon';
+  if (n.includes('coup')) return 'coupe';
   if (n.includes('suv') || n.includes('camioneta') || n.includes('cerrada')) return 'suv';
   if (n.includes('hatch') || n.includes('sin baúl') || n.includes('sin baul')) return 'hatchback';
   return 'sedan';
 };
 
-export const isCoupe = (bodyType: string) => /coup/i.test(bodyType || '');
 
 export const blueprintSrc = (key: BlueprintKey, view: string) => `/blueprints/crops/${key}_${view}.jpg`;
 

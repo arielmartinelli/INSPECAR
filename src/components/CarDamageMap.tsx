@@ -1,7 +1,7 @@
 import { useState, type FC, type MouseEvent } from 'react';
 import { DAMAGE_TYPES, type DamageMarker, type DamageType, type DamageView } from '../types/inspection';
 import { Trash2, MapPin, ChevronLeft, ChevronRight } from 'lucide-react';
-import { VEHICLE_BODY_TYPES, BLUEPRINT_VIEWS, getBlueprintKey, blueprintSrc, isCoupe } from '../data/carData';
+import { VEHICLE_BODY_TYPES, BLUEPRINT_VIEWS, getBlueprintKey, blueprintSrc } from '../data/carData';
 
 interface CarDamageMapProps {
   markers: DamageMarker[];
@@ -61,7 +61,7 @@ export const CarDamageMap: FC<CarDamageMapProps> = ({ markers, bodyType, onBodyT
           <div>
             <h2 className="text-base sm:text-lg font-black tracking-tight text-slate-900 uppercase">Chapa y carrocería</h2>
             <p className="text-xs font-medium text-slate-500">
-              {isCoupe(bodyType) ? 'Coupé: se usa la silueta de sedán como referencia' : 'Elegí el tipo y tocá el plano'}
+              Elegí el tipo y tocá el plano
             </p>
           </div>
         </div>

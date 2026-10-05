@@ -7,14 +7,14 @@
  *
  * Si cambiás algo de este archivo, subí la versión para forzar la limpieza de cachés viejas.
  */
-const VERSION = 'inspecar-v2';
+const VERSION = 'inspecar-v3';
 // ignoreVary: el servidor responde con "Vary: Origin" y los <script type=module> mandan Origin,
 // así que sin esto la copia guardada nunca coincidía y la app quedaba en blanco offline.
 const SHELL = `${VERSION}-shell`;
 const RUNTIME = `${VERSION}-runtime`;
 
 const VIEWS = ['lateral_der', 'lateral_izq', 'frente', 'trasera', 'techo'];
-const BODIES = ['pickup', 'sedan', 'hatchback', 'suv', 'furgon'];
+const BODIES = ['pickup', 'sedan', 'hatchback', 'suv', 'coupe', 'furgon'];
 
 const PRECACHE = [
   '/',
@@ -25,8 +25,7 @@ const PRECACHE = [
   '/logo-card.jpg',
   '/icon-192.png',
   '/icon-512.png',
-  // el furgón no tiene plano de techo
-  ...BODIES.flatMap((b) => VIEWS.filter((v) => !(b === 'furgon' && v === 'techo')).map((v) => `/blueprints/crops/${b}_${v}.jpg`)),
+  ...BODIES.flatMap((b) => VIEWS.map((v) => `/blueprints/crops/${b}_${v}.jpg`)),
   '/logo-white.png'
 ];
 

@@ -9,7 +9,7 @@
 }
 
 /* ══════════════════════════════════════════════════════════════
-   ESTILOS INTERCAMBIABLES (botón de paleta en la cabecera)
+   ESTILOS INTERCAMBIABLES (botón de paleta en la cabecera): Clásico y Taller
    Tailwind v4 usa variables CSS para toda la paleta: cambiando
    las variables por tema se re-colorea toda la app sin tocar cada
    componente. Lo estructural (bordes, sombras, radios) se ajusta
@@ -81,49 +81,13 @@
 :root[data-theme='taller'] h2,
 :root[data-theme='taller'] h3 { font-family: 'Barlow Condensed', sans-serif; letter-spacing: 0.02em; }
 
-/* ── Tema "Ficha técnica": papel milimetrado, tinta azul, líneas finas ── */
-:root[data-theme='ficha'] {
-  --app-bg: #eef2f5;
-  --accent: #1c7ed6;
-  --accent-ink: #ffffff;
-  --font-sans: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
-  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
-  --color-slate-950: #0b1f33;
-  --color-slate-900: #102a43;
-  --color-slate-800: #243b53;
-  --color-slate-700: #334e68;
-  --color-slate-600: #486581;
-  --color-slate-500: #627d98;
-  --color-slate-400: #829ab1;
-  --color-slate-300: #bcccdc;
-  --color-slate-200: #d9e2ec;
-  --color-slate-100: #e6edf3;
-  --color-slate-50: #f5f8fa;
-  --color-emerald-600: #2f9e44;
-  --color-emerald-500: #37b24d;
-  --color-amber-500: #e67700;
-  --color-amber-400: #f08c00;
-  --color-rose-600: #c92a2a;
-  --color-rose-500: #e03131;
-}
-:root[data-theme='ficha'] body {
-  background-image: linear-gradient(#dde5ec 1px, transparent 1px), linear-gradient(90deg, #dde5ec 1px, transparent 1px);
-  background-size: 18px 18px;
-}
-:root[data-theme='ficha'] [class*='shadow-['] { box-shadow: none !important; }
-:root[data-theme='ficha'] .border-2 { border-width: 1.5px; }
-:root[data-theme='ficha'] [class*='shadow-[4px_4px'] { border-color: var(--color-slate-900); }
-:root[data-theme='ficha'] h2,
-:root[data-theme='ficha'] h3 { font-family: 'IBM Plex Sans Condensed', 'IBM Plex Sans', sans-serif; }
-:root[data-theme='ficha'] .app-sidebar { background: rgb(245 248 250 / 0.94); }
-
 /* Botón de acción principal: usa el acento de cada tema */
 .btn-accent {
   background: var(--accent) !important;
   color: var(--accent-ink) !important;
   border-color: var(--accent) !important;
 }
-:root:not([data-theme='taller']):not([data-theme='ficha']) .btn-accent { border-color: #0f172a !important; }
+:root:not([data-theme='taller']) .btn-accent { border-color: #0f172a !important; }
 
 /* Ocultar barra de scroll de las pestañas */
 .scrollbar-none { scrollbar-width: none; }

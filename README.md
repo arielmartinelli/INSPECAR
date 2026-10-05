@@ -5,7 +5,7 @@ Sistema web responsive / PWA para peritaje, chequeo y diagnóstico mecánico pre
 ## Características
 
 - **Base de datos precargada** de marcas y modelos principales de Argentina (Fiat, Volkswagen, Toyota, Ford, Renault, Peugeot, Chevrolet, etc.) y opción de carga manual.
-- **Tipos de carrocería**: Pick-up, Sedán, Hatchback, SUV, Coupé (usa la silueta de sedán) y Furgón / Utilitario (4 vistas, sin techo).
+- **Tipos de carrocería**: Pick-up, Sedán, Hatchback, SUV, Coupé (1 puerta por lado) y Furgón / Utilitario, todos con 5 vistas.
 - **Checklist técnico completo** con calificaciones B (Bueno), R (Regular), M (Malo), intermedias (B/R y R/M) y N/A (no aplica):
   - Interior (20 ítems; 22 en pick-ups con caja de carga)
   - Exterior (17 ítems)
@@ -17,7 +17,7 @@ Sistema web responsive / PWA para peritaje, chequeo y diagnóstico mecánico pre
 - **Daños de chapa**: Dañado, Repintado, Rayón y Reemplazado.
 - **Base de datos (Supabase) con acceso por PIN**: registros con búsqueda por patente, nombre o DNI, estados (Borrador → Finalizada → Entregada → Compró / No compró) y notas de seguimiento. Sin configurar, funciona sólo en el dispositivo. Ver `docs/CONFIGURAR_BASE_DE_DATOS.md`.
 - **Informe de Mantenimiento Preventivo** (servicio adicional): recomendaciones en corto, mediano y largo plazo, con PDF propio.
-- **Vista de PC** con barra lateral y **3 estilos** intercambiables (Clásico, Taller, Ficha técnica).
+- **Vista de PC** con barra lateral y **2 estilos** intercambiables (Clásico y Taller).
 - **App instalable y offline (PWA)**: se agrega a la pantalla de inicio y funciona sin internet, incluido el PDF.
 
 ## Tecnologías

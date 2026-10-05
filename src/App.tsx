@@ -96,7 +96,11 @@ const normalize = (parsed: Partial<InspectionData>): InspectionData => {
     estado: parsed.estado ?? 'borrador',
     damageMarkers: normalizeMarkers(parsed.damageMarkers) // "Bollo" → "Dañado"
   };
-  if (!VEHICLE_BODY_TYPES.includes(data.vehicle.tipoVehiculo)) data.vehicle.tipoVehiculo = base.vehicle.tipoVehiculo;
+  if (!VEHICLE_BODY_TYPES.includes(data.vehicle.tipoVehiculo)) {
+    // nombres viejos (ej. "Coupé (2 puertas)") se mapean al actual; si no, sedán
+    const coupe = VEHICLE_BODY_TYPES.find((t) => /coup/i.test(t));
+    data.vehicle.tipoVehiculo = /coup/i.test(data.vehicle.tipoVehiculo) && coupe ? coupe : base.vehicle.tipoVehiculo;
+  }
   return data;
 };
 

@@ -1,9 +1,8 @@
-export type ThemeId = 'clasico' | 'taller' | 'ficha';
+export type ThemeId = 'clasico' | 'taller';
 
 export const THEMES: { id: ThemeId; label: string; hint: string; swatch: [string, string] }[] = [
   { id: 'clasico', label: 'Clásico', hint: 'El estilo original', swatch: ['#0f172a', '#ffffff'] },
-  { id: 'taller', label: 'Taller', hint: 'Alto contraste, ideal al sol', swatch: ['#1E2124', '#FFC20E'] },
-  { id: 'ficha', label: 'Ficha técnica', hint: 'Estilo plano de ingeniería', swatch: ['#102A43', '#1C7ED6'] }
+  { id: 'taller', label: 'Taller', hint: 'Alto contraste, ideal al sol', swatch: ['#1E2124', '#FFC20E'] }
 ];
 
 const KEY = 'inspecar_theme';
@@ -20,7 +19,7 @@ export const loadTheme = (): ThemeId => {
 export const applyTheme = (t: ThemeId) => {
   document.documentElement.dataset.theme = t;
   const meta = document.querySelector('meta[name="theme-color"]');
-  meta?.setAttribute('content', t === 'taller' ? '#1E2124' : t === 'ficha' ? '#102A43' : '#0f172a');
+  meta?.setAttribute('content', t === 'taller' ? '#1E2124' : '#0f172a');
   try {
     localStorage.setItem(KEY, t);
   } catch {
