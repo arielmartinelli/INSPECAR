@@ -289,14 +289,7 @@ export const POPULAR_VEHICLES: CarDatabase = {
   }
 };
 
-export const VEHICLE_BODY_TYPES = [
-  'Pick-up (Con caja)',
-  'Sedán (Con baúl)',
-  'Hatchback (Sin baúl)',
-  'SUV / Camioneta cerrada',
-  'Coupé (1 puerta por lado)',
-  'Furgón / Utilitario'
-];
+export const VEHICLE_BODY_TYPES = ['Pick-up', 'Sedán', 'Hatchback', 'SUV', 'Coupé', 'Furgón'];
 
 export type BlueprintKey = 'pickup' | 'sedan' | 'hatchback' | 'suv' | 'coupe' | 'furgon';
 export type BlueprintView = 'lateral_der' | 'lateral_izq' | 'frente' | 'trasera' | 'techo';
@@ -324,6 +317,12 @@ export const getBlueprintKey = (bodyType: string): BlueprintKey => {
   return 'sedan';
 };
 
+
+/** Nombre actual del tipo de vehículo (convierte los nombres viejos, ej. "Sedán (Con baúl)" → "Sedán"). */
+export const bodyTypeLabel = (bodyType: string): string => {
+  const label: Record<BlueprintKey, string> = { pickup: 'Pick-up', sedan: 'Sedán', hatchback: 'Hatchback', suv: 'SUV', coupe: 'Coupé', furgon: 'Furgón' };
+  return label[getBlueprintKey(bodyType)];
+};
 
 export const blueprintSrc = (key: BlueprintKey, view: string) => `/blueprints/crops/${key}_${view}.jpg`;
 
