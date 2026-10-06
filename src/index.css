@@ -96,3 +96,32 @@
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
 }
+
+/* ── Diálogos (SweetAlert2) con el estilo de la app ── */
+.insp-swal.swal2-popup {
+  font-family: var(--font-sans);
+  border: 2px solid var(--color-slate-900);
+  border-radius: 0;
+  box-shadow: 6px 6px 0 0 var(--color-slate-900);
+  padding: 1.5rem 1.25rem 1.25rem;
+}
+.insp-swal .swal2-title { font-size: 1.15rem; font-weight: 900; color: var(--color-slate-900); }
+.insp-swal .swal2-html-container { font-size: 0.9rem; color: var(--color-slate-600); white-space: pre-line; }
+.insp-swal .swal2-actions { gap: 0.5rem; width: 100%; }
+.insp-swal-btn {
+  min-height: 44px;
+  padding: 0 1.25rem;
+  font-weight: 800;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  border: 2px solid var(--color-slate-900);
+}
+.insp-swal-ok { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+:root:not([data-theme='taller']) .insp-swal-ok { border-color: #0f172a; }
+.insp-swal-danger { background: #e11d48; color: #fff; border-color: #e11d48; }
+.insp-swal-cancel { background: #fff; color: var(--color-slate-900); border-color: var(--color-slate-300); }
+.insp-swal-btn:focus-visible { outline: 3px solid var(--color-slate-900); outline-offset: 2px; }
+:root[data-theme='taller'] .insp-swal.swal2-popup { border-radius: 16px; border-color: transparent; box-shadow: 0 10px 30px rgb(0 0 0 / 0.2); }
+:root[data-theme='taller'] .insp-swal-btn { border-radius: 10px; }
+:root[data-theme='taller'] .app-sidebar .nav-item.nav-danger { color: #ff8a8a; }

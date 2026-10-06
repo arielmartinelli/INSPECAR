@@ -2,6 +2,7 @@ import { useState, type FC, type MouseEvent } from 'react';
 import { DAMAGE_TYPES, type DamageMarker, type DamageType, type DamageView } from '../types/inspection';
 import { Trash2, MapPin, ChevronLeft, ChevronRight } from 'lucide-react';
 import { VEHICLE_BODY_TYPES, BLUEPRINT_VIEWS, getBlueprintKey, blueprintSrc } from '../data/carData';
+import { confirmAction } from '../lib/dialogs';
 
 interface CarDamageMapProps {
   markers: DamageMarker[];
@@ -44,7 +45,12 @@ export const CarDamageMap: FC<CarDamageMapProps> = ({ markers, bodyType, onBodyT
   };
 
   const handleClearAll = () => {
-    if (window.confirm(`¿Borrar los ${markers.length} puntos marcados en todas las vistas?`)) onChange([]);
+    confirmAction({
+      title: 'Borrar todos los puntos',
+      text: `Se borran los ${markers.length} puntos marcados en todas las vistas.`,
+      confirmText: 'Borrar todos',
+      danger: true
+    }).then((ok) => ok && onChange([]));
   };
   const handleNoteChange = (id: string, note: string) =>
     onChange(markers.map((m) => (m.id === id ? { ...m, note: note || undefined } : m)));

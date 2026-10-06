@@ -1,6 +1,7 @@
 import { useState, type FC } from 'react';
 import { Plus, Trash2, Sparkles, FileDown, Wrench } from 'lucide-react';
 import { PLAZOS, type Mantenimiento, type MantenimientoItem, type Plazo } from '../types/inspection';
+import { notify } from '../lib/dialogs';
 
 interface MaintenanceSectionProps {
   value: Mantenimiento | undefined;
@@ -34,7 +35,7 @@ export const MaintenanceSection: FC<MaintenanceSectionProps> = ({ value, onChang
   const suggest = () => {
     const sug = onSuggest().filter((s) => !m.items.some((i) => i.tarea === s.tarea));
     if (sug.length === 0) {
-      window.alert('No hay ítems en Regular o Malo para sugerir (o ya están cargados).');
+      notify('No hay ítems en Regular o Malo para sugerir, o ya están todos cargados.', 'info', 'Nada para sugerir');
       return;
     }
     update({ items: [...m.items, ...sug] });

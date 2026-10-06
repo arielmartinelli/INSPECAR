@@ -1,5 +1,5 @@
 import type { FC } from 'react';
-import { Database, Plus, Lock, Cloud, CloudOff, HardDrive, Check, type LucideIcon } from 'lucide-react';
+import { Database, Plus, Trash2, Lock, Cloud, CloudOff, HardDrive, Check, type LucideIcon } from 'lucide-react';
 
 export interface NavStep {
   id: string;
@@ -18,6 +18,7 @@ interface SidebarProps {
   onStep: (id: string) => void;
   onRecords: () => void;
   onNew: () => void;
+  onDelete: () => void;
   onLock: () => void;
 }
 
@@ -90,6 +91,13 @@ export const Sidebar: FC<SidebarProps> = (p) => {
               <span className="w-6" />
               <Plus className="w-4 h-4" aria-hidden />
               Nueva inspección
+            </button>
+          </li>
+          <li>
+            <button type="button" onClick={p.onDelete} className="nav-item nav-danger w-full flex items-center gap-3 px-3 py-2.5 border-2 border-transparent text-sm font-bold text-rose-600 hover:bg-rose-50">
+              <span className="w-6" />
+              <Trash2 className="w-4 h-4" aria-hidden />
+              Borrar ficha actual
             </button>
           </li>
         </ul>

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type FC } from 'reac
 import { Search, RefreshCw, FolderOpen, FileDown, X, Send, Trash2, Cloud, HardDrive, Phone, MessageCircle, CloudOff } from 'lucide-react';
 import { ESTADOS, type Estado } from '../types/inspection';
 import { repo, type RecordSummary, type Seguimiento } from '../lib/repo';
+import { notify, confirmAction } from '../lib/dialogs';
 
 interface RecordsViewProps {
   currentId: string;
@@ -69,21 +70,27 @@ export const RecordsView: FC<RecordsViewProps> = ({ currentId, refreshKey, busy,
     try {
       await repo.setEstado(r.id, e);
     } catch {
-      window.alert('No se pudo cambiar el estado. Revisá la conexión.');
+      notify('No se pudo cambiar el estado. Revisá la conexión.');
       load(texto, estado);
     }
   };
 
   const deleteRecord = async (r: RecordSummary) => {
     const nombre = r.patente || r.vehiculo;
-    if (!window.confirm(`¿Borrar definitivamente la inspección ${nombre}${r.clienteNombre ? ` de ${r.clienteNombre}` : ''}?\n\nSe borran también sus notas de seguimiento. No se puede deshacer.`)) return;
+    const ok = await confirmAction({
+      title: `¿Borrar la inspección ${nombre}?`,
+      text: `${r.clienteNombre ? `Cliente: ${r.clienteNombre}\n` : ''}Se borran también sus notas de seguimiento. No se puede deshacer.`,
+      confirmText: 'Borrar',
+      danger: true
+    });
+    if (!ok) return;
     try {
       await repo.remove(r.id);
       setRows((prev) => prev.filter((x) => x.id !== r.id));
       setSelected((s) => (s?.id === r.id ? null : s));
       onDeleted(r.id);
     } catch {
-      window.alert('No se pudo borrar. Revisá la conexión.');
+      notify('No se pudo borrar. Revisá la conexión.');
     }
   };
 
@@ -321,7 +328,7 @@ const FollowUpDrawer: FC<{
       setNueva('');
       setNotas(await repo.listSeguimientos(record.id));
     } catch {
-      window.alert('No se pudo guardar la nota. Si la inspección todavía no subió a la nube, esperá a tener señal.');
+      notify('No se pudo guardar la nota. Si la inspección todavía no subió a la nube, esperá a tener señal.');
     } finally {
       setSaving(false);
     }

@@ -43,8 +43,10 @@ import {
   Share2,
   Database,
   ArrowLeft,
-  Pencil
+  Pencil,
+  Trash2
 } from 'lucide-react';
+import { notify, confirmAction } from './lib/dialogs';
 
 const STORAGE_KEY = 'inspecar_draft_v3';
 
@@ -233,7 +235,7 @@ function Inspecar() {
       await fn();
     } catch (error) {
       console.error(error);
-      alert('Hubo un error al generar el PDF. Verificá los datos.');
+      notify('Hubo un error al generar el PDF. Revisá los datos e intentá de nuevo.');
     } finally {
       setIsGeneratingPdf(false);
     }
@@ -271,7 +273,7 @@ function Inspecar() {
     if (hasContent(current)) await repo.save(current); // la planilla actual no se pierde
     const d = await repo.get(id);
     if (!d) {
-      alert('No se encontró la inspección.');
+      notify('No se encontró la inspección. Puede que se haya borrado desde otro dispositivo.');
       return;
     }
     setData(normalize(d));
@@ -286,11 +288,34 @@ function Inspecar() {
 
   const handleNew = async () => {
     const msg = hasContent(data) ? '¿Empezar una nueva inspección? La actual queda guardada en Registros.' : '¿Empezar una nueva inspección?';
-    if (!window.confirm(msg)) return;
+    if (!(await confirmAction({ title: 'Nueva inspección', text: msg, confirmText: 'Empezar nueva' }))) return;
     if (hasContent(data)) await repo.save(data);
     setData(getInitialData());
     setActiveTab('vehiculo');
     setView('inspeccion');
+    setRefreshKey((k) => k + 1);
+  };
+
+  // Borra la ficha abierta completa: los datos cargados y su registro (también en la nube)
+  const handleDeleteCurrent = async () => {
+    if (!hasContent(data)) {
+      notify('La ficha está vacía, no hay nada para borrar.', 'info', 'Ficha vacía');
+      return;
+    }
+    const ok = await confirmAction({
+      title: `¿Borrar la ficha ${data.vehicle.dominio || 'actual'}?`,
+      text: 'Se borran todos los datos cargados de esta inspección (vehículo, cliente, checklist, chapa, observaciones) y su registro. No se puede deshacer.',
+      confirmText: 'Borrar ficha',
+      danger: true
+    });
+    if (!ok) return;
+    try {
+      await repo.remove(data.id);
+    } catch {
+      notify('Se limpió la ficha, pero no se pudo borrar el registro de la nube. Borralo desde Registros cuando tengas señal.', 'warning');
+    }
+    setData(getInitialData());
+    setActiveTab('vehiculo');
     setRefreshKey((k) => k + 1);
   };
 
@@ -346,6 +371,7 @@ function Inspecar() {
         onStep={goTab}
         onRecords={() => setView('registros')}
         onNew={handleNew}
+        onDelete={handleDeleteCurrent}
         onLock={() => lockApp()}
       />
 
@@ -385,6 +411,17 @@ function Inspecar() {
               >
                 <Plus className="w-4 h-4" />
               </button>
+              {view === 'inspeccion' && (
+                <button
+                  type="button"
+                  onClick={handleDeleteCurrent}
+                  className="p-2 border-2 border-rose-200 text-rose-600 hover:border-rose-600 hover:bg-rose-50 bg-white"
+                  title="Borrar ficha completa"
+                  aria-label="Borrar ficha completa"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => handleDownloadPDF()}
