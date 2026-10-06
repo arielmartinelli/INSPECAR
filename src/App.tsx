@@ -44,7 +44,8 @@ import {
   Database,
   ArrowLeft,
   Pencil,
-  Trash2
+  Trash2,
+  Eraser
 } from 'lucide-react';
 import { notify, confirmAction } from './lib/dialogs';
 
@@ -159,6 +160,7 @@ function Inspecar() {
   const [theme, setTheme] = useState<ThemeId>(loadTheme);
   const [sync, setSync] = useState<'local' | 'saving' | 'saved' | 'pending'>(cloudEnabled ? 'saved' : 'local');
   const [refreshKey, setRefreshKey] = useState(0);
+  const [vehKey, setVehKey] = useState(0); // fuerza a reiniciar el formulario del vehículo al limpiarlo
   const dataRef = useRef(data);
   useEffect(() => {
     dataRef.current = data;
@@ -317,6 +319,68 @@ function Inspecar() {
     setData(getInitialData());
     setActiveTab('vehiculo');
     setRefreshKey((k) => k + 1);
+  };
+
+  // Limpia sólo el paso actual (sus datos y sus observaciones), con confirmación
+  const SECTION_CLEAR: Partial<Record<TabId, string>> = {
+    vehiculo: 'los datos del vehículo y del cliente',
+    interior: 'las calificaciones y observaciones de Interior',
+    exterior: 'las calificaciones y observaciones de Exterior',
+    mecanica: 'las calificaciones y observaciones de Mecánica',
+    accesorios: 'los accesorios marcados y sus observaciones',
+    carroceria: 'todos los puntos de chapa y sus observaciones'
+  };
+  const sectionHasData = (t: TabId): boolean => {
+    const obs = (k: ObsSection) => Boolean(data.obsSecciones?.[k]?.trim());
+    switch (t) {
+      case 'vehiculo': {
+        const v = data.vehicle, b = getInitialData().vehicle;
+        return (Object.keys(v) as (keyof typeof v)[]).some((k) => k !== 'fecha' && (v[k] ?? '') !== (b[k] ?? ''));
+      }
+      case 'interior':
+      case 'exterior':
+      case 'mecanica':
+        return Object.values(data[t]).some((x) => x != null) || obs(t);
+      case 'accesorios':
+        return Object.values(data.accesorios).some((x) => x != null) || obs('accesorios');
+      case 'carroceria':
+        return data.damageMarkers.length > 0 || obs('carroceria');
+      default:
+        return false;
+    }
+  };
+  const handleClearSection = async (t: TabId) => {
+    const what = SECTION_CLEAR[t];
+    if (!what) return;
+    const label = TABS.find((x) => x.id === t)?.label ?? '';
+    const ok = await confirmAction({
+      title: `¿Limpiar ${label}?`,
+      text: `Se borran ${what}. El resto de la ficha queda igual.`,
+      confirmText: 'Limpiar',
+      danger: true
+    });
+    if (!ok) return;
+    if (t === 'vehiculo') setVehKey((k) => k + 1);
+    setData((p) => {
+      const obsSecciones = { ...p.obsSecciones };
+      switch (t) {
+        case 'vehiculo':
+          return { ...p, vehicle: { ...getInitialData().vehicle, fecha: p.vehicle.fecha } };
+        case 'interior':
+        case 'exterior':
+        case 'mecanica':
+          delete obsSecciones[t];
+          return { ...p, [t]: {}, obsSecciones };
+        case 'accesorios':
+          delete obsSecciones.accesorios;
+          return { ...p, accesorios: {}, obsSecciones };
+        case 'carroceria':
+          delete obsSecciones.carroceria;
+          return { ...p, damageMarkers: [], obsSecciones };
+        default:
+          return p;
+      }
+    });
   };
 
   // ── totales ───────────────────────────────────────────────
@@ -488,8 +552,22 @@ function Inspecar() {
                 </span>
               </p>
 
+              {activeTab !== 'resumen' && (
+                <div className="flex justify-end mb-2">
+                  <button
+                    type="button"
+                    onClick={() => handleClearSection(activeTab)}
+                    disabled={!sectionHasData(activeTab)}
+                    className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 border-2 border-rose-200 text-rose-600 bg-white hover:border-rose-600 hover:bg-rose-50 disabled:opacity-40 disabled:hover:bg-white disabled:hover:border-rose-200"
+                    title={`Limpiar ${TABS[currentTabIndex].label}`}
+                  >
+                    <Eraser className="w-3.5 h-3.5" aria-hidden /> Limpiar {TABS[currentTabIndex].label.toLowerCase()}
+                  </button>
+                </div>
+              )}
+
               {activeTab === 'vehiculo' && (
-                <VehicleHeaderForm vehicle={data.vehicle} onChange={(vehicle) => setData((p) => ({ ...p, vehicle }))} />
+                <VehicleHeaderForm key={`${data.id}-${vehKey}`} vehicle={data.vehicle} onChange={(vehicle) => setData((p) => ({ ...p, vehicle }))} />
               )}
 
               {(['interior', 'exterior', 'mecanica'] as const).map(
