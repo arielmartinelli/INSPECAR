@@ -2,15 +2,20 @@ import { useState, type FC, type ChangeEvent } from 'react';
 import type { VehicleInfo } from '../types/inspection';
 import { POPULAR_VEHICLES, VEHICLE_BODY_TYPES, FUEL_TYPES } from '../data/carData';
 import { User, Car, Hash, Calendar, Gauge, Fuel, ShieldCheck, Edit3, ListFilter } from 'lucide-react';
+import { ClearButton } from './ClearButton';
 
 const MAX_YEAR = new Date().getFullYear() + 1;
 
 interface VehicleHeaderFormProps {
+  /** Paso actual, ej. "2/7" */
+  step?: string;
+  onClear?: () => void;
+  canClear?: boolean;
   vehicle: VehicleInfo;
   onChange: (updated: VehicleInfo) => void;
 }
 
-export const VehicleHeaderForm: FC<VehicleHeaderFormProps> = ({ vehicle, onChange }) => {
+export const VehicleHeaderForm: FC<VehicleHeaderFormProps> = ({ vehicle, onChange, step = '1', onClear, canClear }) => {
   const [customBrandMode, setCustomBrandMode] = useState(vehicle.marca === 'OTRA');
   const [customModelMode, setCustomModelMode] = useState(vehicle.modelo === 'OTRO');
 
@@ -72,8 +77,8 @@ export const VehicleHeaderForm: FC<VehicleHeaderFormProps> = ({ vehicle, onChang
       {/* Section Header */}
       <div className="flex items-center justify-between border-b-2 border-slate-900 pb-3 mb-5">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-slate-900 text-white flex items-center justify-center font-bold text-sm">
-            01
+          <div className="min-w-8 h-8 px-1.5 bg-slate-900 text-white flex items-center justify-center whitespace-nowrap font-mono font-bold text-sm">
+            {step}
           </div>
           <div>
             <h2 className="text-base sm:text-lg font-black tracking-tight text-slate-900 uppercase">
@@ -85,9 +90,7 @@ export const VehicleHeaderForm: FC<VehicleHeaderFormProps> = ({ vehicle, onChang
           </div>
         </div>
 
-        <span className="hidden sm:inline-block text-[11px] font-mono font-bold uppercase tracking-wider bg-slate-100 text-slate-700 px-2.5 py-1 border border-slate-300">
-          INSPECAR SHEET
-        </span>
+        <ClearButton onClick={onClear} disabled={!canClear} label="vehículo" />
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">

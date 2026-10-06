@@ -1,10 +1,13 @@
 import type { FC, ReactNode } from 'react';
 import type { ScoreValue } from '../types/inspection';
 import { Check, AlertTriangle, X } from 'lucide-react';
+import { ClearButton } from './ClearButton';
 
 interface InspectionSectionProps {
   title: string;
   stepNumber: string;
+  onClear?: () => void;
+  canClear?: boolean;
   items: string[];
   values: Record<string, ScoreValue>;
   onChange: (item: string, value: ScoreValue) => void;
@@ -19,6 +22,8 @@ export const InspectionSection: FC<InspectionSectionProps> = ({
   values,
   onChange,
   onBulkChange,
+  onClear,
+  canClear,
   icon
 }) => {
   const total = items.length;
@@ -92,7 +97,7 @@ export const InspectionSection: FC<InspectionSectionProps> = ({
       {/* Header Geometric Box */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b-2 border-slate-900 pb-3 mb-3">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 bg-slate-900 text-white flex items-center justify-center font-mono font-bold text-sm shrink-0">
+          <div className="min-w-8 h-8 px-1.5 bg-slate-900 text-white flex items-center justify-center whitespace-nowrap font-mono font-bold text-sm shrink-0">
             {stepNumber}
           </div>
           <div>
@@ -121,10 +126,11 @@ export const InspectionSection: FC<InspectionSectionProps> = ({
             onClick={handleMarkPendingGood}
             disabled={pending === 0}
             title="Marca como Bueno sólo los ítems que todavía no evaluaste"
-            className="text-xs bg-slate-900 hover:bg-slate-800 disabled:opacity-40 text-white px-3 py-1 font-bold uppercase tracking-wider transition-colors active:translate-x-0.5 active:translate-y-0.5"
+            className="h-8 text-xs bg-slate-900 hover:bg-slate-800 disabled:opacity-40 text-white px-3 py-1 font-bold uppercase tracking-wider transition-colors active:translate-x-0.5 active:translate-y-0.5"
           >
             Resto B{pending > 0 ? ` (${pending})` : ''}
           </button>
+          <ClearButton onClick={onClear} disabled={!canClear} label={title.replace(/^Puntos de control: /i, '')} />
         </div>
       </div>
 

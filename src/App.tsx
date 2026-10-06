@@ -44,8 +44,7 @@ import {
   Database,
   ArrowLeft,
   Pencil,
-  Trash2,
-  Eraser
+  Trash2
 } from 'lucide-react';
 import { notify, confirmAction } from './lib/dialogs';
 
@@ -444,7 +443,15 @@ function Inspecar() {
         <header className="app-topbar sticky top-0 z-40 bg-white border-b-2 border-slate-900 shadow-sm">
           <div className="max-w-3xl lg:max-w-5xl mx-auto px-3 sm:px-4 lg:px-8 py-2.5 flex items-center justify-between gap-2">
             <div className="flex items-center gap-3 min-w-0">
-              <img src="/logo.png" alt="INSPECAR" className="logo-img h-7 sm:h-8 w-auto object-contain lg:hidden" />
+              <span className="relative lg:hidden shrink-0">
+                <img src="/logo.png" alt="INSPECAR" className="logo-img h-7 sm:h-8 w-auto object-contain" />
+                <span
+                  className={`absolute -top-1 -right-2 w-2.5 h-2.5 rounded-full ring-2 ring-white ${sync === 'pending' ? 'bg-amber-500' : sync === 'saving' ? 'bg-slate-400 animate-pulse' : 'bg-emerald-500'}`}
+                  role="status"
+                  aria-label={sync === 'pending' ? 'Sin señal: se sube después' : sync === 'saving' ? 'Guardando' : 'Guardado'}
+                  title={sync === 'pending' ? 'Sin señal: se sube después' : sync === 'saving' ? 'Guardando…' : 'Guardado'}
+                />
+              </span>
               <div className="hidden lg:block min-w-0">
                 <p className="text-[11px] font-mono uppercase tracking-widest opacity-60">
                   {view === 'registros' ? 'Gestión' : `Paso ${currentTabIndex + 1} de ${TABS.length}`}
@@ -543,31 +550,8 @@ function Inspecar() {
             />
           ) : (
             <>
-              <p className="lg:hidden flex items-center justify-between text-[11px] text-slate-500 mb-3 px-1 font-mono">
-                <span>
-                  {sync === 'pending' ? '● Sin señal: se sube después' : sync === 'saving' ? '● Guardando…' : '● Guardado'}
-                </span>
-                <span className="font-bold text-slate-600">
-                  Paso {currentTabIndex + 1} de {TABS.length}
-                </span>
-              </p>
-
-              {activeTab !== 'resumen' && (
-                <div className="flex justify-end mb-2">
-                  <button
-                    type="button"
-                    onClick={() => handleClearSection(activeTab)}
-                    disabled={!sectionHasData(activeTab)}
-                    className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 border-2 border-rose-200 text-rose-600 bg-white hover:border-rose-600 hover:bg-rose-50 disabled:opacity-40 disabled:hover:bg-white disabled:hover:border-rose-200"
-                    title={`Limpiar ${TABS[currentTabIndex].label}`}
-                  >
-                    <Eraser className="w-3.5 h-3.5" aria-hidden /> Limpiar {TABS[currentTabIndex].label.toLowerCase()}
-                  </button>
-                </div>
-              )}
-
               {activeTab === 'vehiculo' && (
-                <VehicleHeaderForm key={`${data.id}-${vehKey}`} vehicle={data.vehicle} onChange={(vehicle) => setData((p) => ({ ...p, vehicle }))} />
+                <VehicleHeaderForm key={`${data.id}-${vehKey}`} step={`${currentTabIndex + 1}/${TABS.length}`} onClear={() => handleClearSection('vehiculo')} canClear={sectionHasData('vehiculo')} vehicle={data.vehicle} onChange={(vehicle) => setData((p) => ({ ...p, vehicle }))} />
               )}
 
               {(['interior', 'exterior', 'mecanica'] as const).map(
@@ -576,7 +560,9 @@ function Inspecar() {
                     <div key={sec}>
                       <InspectionSection
                         title={`Puntos de control: ${OBS_SECTION_LABEL[sec]}`}
-                        stepNumber={String(currentTabIndex + 1).padStart(2, '0')}
+                        stepNumber={`${currentTabIndex + 1}/${TABS.length}`}
+                        onClear={() => handleClearSection(sec)}
+                        canClear={sectionHasData(sec)}
                         items={sectionItems[sec]}
                         values={data[sec]}
                         onChange={(item, val) => handleScoreChange(sec, item, val)}
@@ -595,6 +581,9 @@ function Inspecar() {
                     values={data.accesorios}
                     onChange={handleAccessoryChange}
                     onBulkChange={handleAccessoryBulk}
+                    step={`${currentTabIndex + 1}/${TABS.length}`}
+                    onClear={() => handleClearSection('accesorios')}
+                    canClear={sectionHasData('accesorios')}
                   />
                   {notesFor('accesorios')}
                 </>
@@ -607,6 +596,9 @@ function Inspecar() {
                     bodyType={data.vehicle.tipoVehiculo}
                     onBodyTypeChange={(tipoVehiculo) => setData((p) => ({ ...p, vehicle: { ...p.vehicle, tipoVehiculo } }))}
                     onChange={(damageMarkers) => setData((p) => ({ ...p, damageMarkers }))}
+                    step={`${currentTabIndex + 1}/${TABS.length}`}
+                    onClear={() => handleClearSection('carroceria')}
+                    canClear={sectionHasData('carroceria')}
                   />
                   {notesFor('carroceria')}
                 </>

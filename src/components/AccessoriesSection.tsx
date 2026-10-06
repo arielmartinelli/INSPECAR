@@ -1,19 +1,27 @@
 import type { FC } from 'react';
 import type { YesNoValue } from '../types/inspection';
 import { Wrench, Check, X } from 'lucide-react';
+import { ClearButton } from './ClearButton';
 
 interface AccessoriesSectionProps {
   items: string[];
   values: Record<string, YesNoValue>;
   onChange: (item: string, value: YesNoValue) => void;
   onBulkChange: (updates: Record<string, YesNoValue>) => void;
+  /** Paso actual, ej. "2/7" */
+  step?: string;
+  onClear?: () => void;
+  canClear?: boolean;
 }
 
 export const AccessoriesSection: FC<AccessoriesSectionProps> = ({
   items,
   values,
   onChange,
-  onBulkChange
+  onBulkChange,
+  step = '5',
+  onClear,
+  canClear
 }) => {
   const pending = items.filter((i) => values[i] == null);
   // Sólo completa los pendientes: no pisa un NO ya marcado.
@@ -25,8 +33,8 @@ export const AccessoriesSection: FC<AccessoriesSectionProps> = ({
     <div className="bg-white border-2 border-slate-900 rounded-none shadow-[4px_4px_0px_0px_rgba(15,23,42,1)] p-4 sm:p-6 mb-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b-2 border-slate-900 pb-4 mb-4">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-slate-900 text-white flex items-center justify-center font-mono font-bold text-sm">
-            05
+          <div className="min-w-8 h-8 px-1.5 bg-slate-900 text-white flex items-center justify-center whitespace-nowrap font-mono font-bold text-sm">
+            {step}
           </div>
           <div>
             <div className="flex items-center gap-2">
@@ -41,14 +49,17 @@ export const AccessoriesSection: FC<AccessoriesSectionProps> = ({
           </div>
         </div>
 
+        <div className="flex items-center gap-2 self-start sm:self-auto">
         <button
           type="button"
           onClick={handleMarkPendingYes}
           disabled={pending.length === 0}
-          className="text-xs bg-slate-900 hover:bg-slate-800 text-white px-3.5 py-1.5 font-bold uppercase tracking-wider transition-colors disabled:opacity-40 self-start sm:self-auto active:translate-x-0.5 active:translate-y-0.5"
+          className="h-8 text-xs bg-slate-900 hover:bg-slate-800 text-white px-3.5 py-1.5 font-bold uppercase tracking-wider transition-colors disabled:opacity-40 active:translate-x-0.5 active:translate-y-0.5"
         >
           Resto SÍ
         </button>
+        <ClearButton onClick={onClear} disabled={!canClear} label="accesorios" />
+        </div>
       </div>
 
       <div className="divide-y border-t border-b border-slate-200">

@@ -3,6 +3,7 @@ import { DAMAGE_TYPES, type DamageMarker, type DamageType, type DamageView } fro
 import { Trash2, MapPin, ChevronLeft, ChevronRight } from 'lucide-react';
 import { VEHICLE_BODY_TYPES, BLUEPRINT_VIEWS, getBlueprintKey, blueprintSrc } from '../data/carData';
 import { confirmAction } from '../lib/dialogs';
+import { ClearButton } from './ClearButton';
 
 interface CarDamageMapProps {
   markers: DamageMarker[];
@@ -11,6 +12,10 @@ interface CarDamageMapProps {
   onChange: (markers: DamageMarker[]) => void;
   /** Observaciones de la sección (se muestran debajo) */
   footer?: React.ReactNode;
+  /** Paso actual, ej. "2/7" */
+  step?: string;
+  onClear?: () => void;
+  canClear?: boolean;
 }
 
 const VIEW_LABEL: Record<DamageView, { label: string; short: string }> = {
@@ -21,7 +26,7 @@ const VIEW_LABEL: Record<DamageView, { label: string; short: string }> = {
   techo: { label: 'Planta / Techo', short: 'Techo' }
 };
 
-export const CarDamageMap: FC<CarDamageMapProps> = ({ markers, bodyType, onBodyTypeChange, onChange, footer }) => {
+export const CarDamageMap: FC<CarDamageMapProps> = ({ markers, bodyType, onBodyTypeChange, onChange, footer, step = '6', onClear, canClear }) => {
   const [selectedType, setSelectedType] = useState<DamageType>('D');
   const [view, setView] = useState<DamageView>('lateral_der');
 
@@ -63,7 +68,7 @@ export const CarDamageMap: FC<CarDamageMapProps> = ({ markers, bodyType, onBodyT
     <section className="bg-white border-2 border-slate-900 shadow-[4px_4px_0px_0px_rgba(15,23,42,1)] p-3 sm:p-5 mb-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border-b-2 border-slate-900 pb-3 mb-3">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 bg-slate-900 text-white flex items-center justify-center font-mono font-bold text-sm shrink-0">06</div>
+          <div className="min-w-8 h-8 px-1.5 bg-slate-900 text-white flex items-center justify-center whitespace-nowrap font-mono font-bold text-sm shrink-0">{step}</div>
           <div>
             <h2 className="text-base sm:text-lg font-black tracking-tight text-slate-900 uppercase">Chapa y carrocería</h2>
             <p className="text-xs font-medium text-slate-500">
@@ -71,13 +76,13 @@ export const CarDamageMap: FC<CarDamageMapProps> = ({ markers, bodyType, onBodyT
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-2 self-start sm:self-auto">
+        <div className="flex items-center gap-2 w-full sm:w-auto">
           {onBodyTypeChange && (
             <select
               aria-label="Tipo de carrocería"
               value={bodyType}
               onChange={(e) => onBodyTypeChange(e.target.value)}
-              className="bg-slate-100 border-2 border-slate-900 text-xs font-bold px-2.5 py-1.5 uppercase font-mono text-slate-900 focus:outline-none"
+              className="min-w-0 flex-1 sm:flex-none bg-slate-100 border-2 border-slate-900 text-xs font-bold px-2.5 py-1.5 h-8 uppercase font-mono text-slate-900 focus:outline-none"
             >
               {VEHICLE_BODY_TYPES.map((t) => (
                 <option key={t} value={t}>
@@ -86,10 +91,11 @@ export const CarDamageMap: FC<CarDamageMapProps> = ({ markers, bodyType, onBodyT
               ))}
             </select>
           )}
-          <div className="flex items-center gap-1 text-xs font-mono font-bold bg-slate-100 px-2.5 py-1.5 border border-slate-900">
+          <div className="shrink-0 h-8 flex items-center gap-1 whitespace-nowrap text-xs font-mono font-bold bg-slate-100 px-2 border border-slate-900">
             <MapPin className="w-3.5 h-3.5 text-rose-600" aria-hidden />
             <span>{markers.length} puntos</span>
           </div>
+          <ClearButton onClick={onClear} disabled={!canClear} label="chapa" />
         </div>
       </div>
 
