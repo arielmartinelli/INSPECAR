@@ -26,7 +26,7 @@ import { RecordsView } from './components/RecordsView';
 import { Sidebar, type NavStep } from './components/Sidebar';
 import { ThemeMenu } from './components/ThemeMenu';
 import { PinGate } from './components/PinGate';
-import { repo, hasContent, vehicleLabel } from './lib/repo';
+import { repo, hasContent } from './lib/repo';
 import { cloudEnabled, lockApp } from './lib/supabase';
 import { applyTheme, loadTheme, type ThemeId } from './lib/theme';
 import {
@@ -341,9 +341,6 @@ function Inspecar() {
         steps={navSteps}
         activeStep={activeTab}
         view={view}
-        patente={data.vehicle.dominio}
-        vehiculo={vehicleLabel(data)}
-        cliente={[data.vehicle.clienteNombre, data.vehicle.clienteDni && `DNI ${data.vehicle.clienteDni}`].filter(Boolean).join(' · ')}
         sync={sync}
         canLock={cloudEnabled}
         onStep={goTab}

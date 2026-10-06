@@ -13,9 +13,6 @@ interface SidebarProps {
   steps: NavStep[];
   activeStep: string;
   view: 'inspeccion' | 'registros';
-  patente: string;
-  vehiculo: string;
-  cliente: string;
   sync: 'local' | 'saving' | 'saved' | 'pending';
   canLock: boolean;
   onStep: (id: string) => void;
@@ -36,16 +33,8 @@ export const Sidebar: FC<SidebarProps> = (p) => {
   const S = SYNC[p.sync];
   return (
     <aside className="app-sidebar hidden lg:flex flex-col w-72 shrink-0 h-screen sticky top-0 bg-white border-r-2 border-slate-900">
-      <div className="px-5 pt-5 pb-4">
+      <div className="px-5 pt-5 pb-5">
         <img src="/logo.png" alt="INSPECAR" className="logo-img h-8 w-auto" />
-      </div>
-
-      <div className="veh-card mx-4 mb-4 p-3 border-2 border-slate-200 bg-slate-50">
-        <span className="plate inline-block font-mono font-black tracking-widest text-base bg-yellow-50 text-slate-900 border-2 border-slate-900 px-2">
-          {p.patente || 'SIN PATENTE'}
-        </span>
-        <p className="text-sm font-bold mt-1.5 truncate">{p.vehiculo}</p>
-        <p className="muted text-xs text-slate-500 truncate">{p.cliente || 'Cliente sin cargar'}</p>
       </div>
 
       <nav className="flex-1 overflow-y-auto px-3" aria-label="Pasos de la inspección">
