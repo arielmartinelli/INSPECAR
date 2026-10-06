@@ -1,5 +1,5 @@
 import { useEffect, useState, type FC, type ReactNode } from 'react';
-import { Delete, Lock, WifiOff } from 'lucide-react';
+import { Lock, WifiOff } from 'lucide-react';
 import { supabase, cloudEnabled, WORKSHOP_EMAIL } from '../lib/supabase';
 
 /**
@@ -55,11 +55,9 @@ export const PinGate: FC<{ children: ReactNode }> = ({ children }) => {
     sessionStorage.removeItem('inspecar_pin_tries');
   };
 
-  const press = (d: string) => {
-    if (pin.length >= 12) return;
-    setPin(pin + d);
-    setError('');
-  };
+  // En celular/tablet: campo de texto numérico (así se abre el teclado numérico del sistema)
+  // con los dígitos ocultos por CSS. En PC: campo de contraseña común y se escribe con el teclado.
+  const touch = typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches;
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-slate-900 text-white">
@@ -80,38 +78,33 @@ export const PinGate: FC<{ children: ReactNode }> = ({ children }) => {
         </label>
         <input
           id="pin"
-          type="password"
+          type={touch ? 'text' : 'password'}
           inputMode="numeric"
-          autoComplete="current-password"
+          pattern="[0-9]*"
+          autoComplete={touch ? 'off' : 'current-password'}
+          autoCorrect="off"
+          spellCheck={false}
+          enterKeyHint="go"
           value={pin}
-          onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 12))}
+          onChange={(e) => {
+            setPin(e.target.value.replace(/\D/g, '').slice(0, 12));
+            setError('');
+          }}
+          style={touch ? ({ WebkitTextSecurity: 'disc' } as React.CSSProperties) : undefined}
           className="w-full text-center text-3xl tracking-[0.5em] font-mono bg-slate-800 border-2 border-slate-700 focus:border-white rounded-xl py-3 outline-none"
           autoFocus
         />
-        <p role="alert" className="h-5 text-center text-sm text-rose-400 mt-2">
+        <p role="alert" className="min-h-5 text-center text-sm text-rose-400 mt-2">
           {error}
         </p>
-
-        <div className="grid grid-cols-3 gap-2.5 mt-3">
-          {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((d) => (
-            <button key={d} type="button" onClick={() => press(d)} className="h-14 rounded-xl bg-slate-800 hover:bg-slate-700 text-xl font-bold">
-              {d}
-            </button>
-          ))}
-          <button type="button" onClick={() => setPin(pin.slice(0, -1))} className="h-14 rounded-xl bg-slate-800 grid place-items-center" aria-label="Borrar">
-            <Delete className="w-5 h-5" />
-          </button>
-          <button type="button" onClick={() => press('0')} className="h-14 rounded-xl bg-slate-800 hover:bg-slate-700 text-xl font-bold">
-            0
-          </button>
-          <button
-            type="submit"
-            disabled={busy || pin.length < 6}
-            className="h-14 rounded-xl bg-amber-400 text-slate-900 font-black disabled:opacity-40"
-          >
-            {busy ? '…' : 'Entrar'}
-          </button>
-        </div>
+        <button
+          type="submit"
+          disabled={busy || pin.length < 6}
+          className="w-full h-14 mt-3 rounded-xl bg-amber-400 text-slate-900 text-lg font-black disabled:opacity-40"
+        >
+          {busy ? 'Verificando…' : 'Entrar'}
+        </button>
+        {!touch && <p className="text-center text-xs text-slate-500 mt-3">Escribí el PIN y apretá Enter.</p>}
       </form>
 
       {!navigator.onLine && (
