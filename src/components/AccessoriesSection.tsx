@@ -73,7 +73,7 @@ export const AccessoriesSection: FC<AccessoriesSectionProps> = ({
                 idx % 2 === 0 ? 'bg-slate-50/60' : 'bg-white'
               }`}
             >
-              <span className="text-xs sm:text-sm font-semibold text-slate-800">
+              <span className="text-sm sm:text-base font-bold text-slate-900 leading-snug">
                 {item}
               </span>
 

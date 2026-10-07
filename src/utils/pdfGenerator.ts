@@ -1,7 +1,7 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import type { InspectionData, DamageMarker, ScoreValue } from '../types/inspection';
-import { getInteriorItems, EXTERIOR_ITEMS, MECANICA_ITEMS, ACCESORIOS_ITEMS, SCORE_LABEL, DAMAGE_TYPES, compileObservaciones } from '../types/inspection';
+import { INTERIOR_ITEMS, getExteriorItems, MECANICA_ITEMS, ACCESORIOS_ITEMS, SCORE_LABEL, DAMAGE_TYPES, compileObservaciones } from '../types/inspection';
 import { getBlueprintKey } from '../data/carData';
 
 const scoreText = (v: ScoreValue | undefined) => (v ? SCORE_LABEL[v] : '-');
@@ -348,15 +348,15 @@ export async function generateInspectionPDF(data: InspectionData): Promise<jsPDF
   currentY += 24;
 
   // 2. TABLA DE CONTROL DE 3 COLUMNAS (Interior, Exterior, Mecánica)
-  const INTERIOR_ITEMS = getInteriorItems(data.vehicle.tipoVehiculo); // sin "Caja de carga" si no es pick-up
-  const maxRows = Math.max(INTERIOR_ITEMS.length, EXTERIOR_ITEMS.length, MECANICA_ITEMS.length);
+  const extItems = getExteriorItems(data.vehicle.tipoVehiculo); // con "Caja de carga" sólo si es pick-up
+  const maxRows = Math.max(INTERIOR_ITEMS.length, extItems.length, MECANICA_ITEMS.length);
   const tableBody: any[] = [];
 
   for (let i = 0; i < maxRows; i++) {
     const intItem = INTERIOR_ITEMS[i];
     const intScore = intItem ? scoreText(data.interior[intItem]) : '';
 
-    const extItem = EXTERIOR_ITEMS[i];
+    const extItem = extItems[i];
     const extScore = extItem ? scoreText(data.exterior[extItem]) : '';
 
     const mecItem = MECANICA_ITEMS[i];
@@ -385,8 +385,8 @@ export async function generateInspectionPDF(data: InspectionData): Promise<jsPDF
     body: tableBody,
     theme: 'grid',
     styles: {
-      fontSize: 7.2,
-      cellPadding: 1.3,
+      fontSize: 7.5,
+      cellPadding: 1.35,
       textColor: [15, 23, 42],
       lineWidth: 0.12,
       lineColor: [15, 23, 42]
@@ -395,7 +395,7 @@ export async function generateInspectionPDF(data: InspectionData): Promise<jsPDF
       fillColor: [30, 41, 59],
       textColor: [255, 255, 255],
       fontStyle: 'bold',
-      fontSize: 7.2,
+      fontSize: 7.5,
       lineWidth: 0.15,
       lineColor: [15, 23, 42]
     },
@@ -504,7 +504,7 @@ export async function generateInspectionPDF(data: InspectionData): Promise<jsPDF
   // Sólo se cuentan los ítems visibles para esta carrocería
   const allScores = [
     ...INTERIOR_ITEMS.map((i) => data.interior[i]),
-    ...EXTERIOR_ITEMS.map((i) => data.exterior[i]),
+    ...extItems.map((i) => data.exterior[i]),
     ...MECANICA_ITEMS.map((i) => data.mecanica[i])
   ];
   const countB = allScores.filter((s) => s === 'B' || s === 'B-R').length;

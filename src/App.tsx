@@ -5,8 +5,8 @@ import {
   type YesNoValue,
   type ObsSection,
   type Estado,
-  getInteriorItems,
-  EXTERIOR_ITEMS,
+  INTERIOR_ITEMS,
+  getExteriorItems,
   MECANICA_ITEMS,
   ACCESORIOS_ITEMS,
   ESTADOS,
@@ -208,8 +208,8 @@ function Inspecar() {
     window.scrollTo({ top: 0 });
   }, [activeTab, view]);
 
-  const interiorItems = getInteriorItems(data.vehicle.tipoVehiculo);
-  const sectionItems = { interior: interiorItems, exterior: EXTERIOR_ITEMS, mecanica: MECANICA_ITEMS };
+  const exteriorItems = getExteriorItems(data.vehicle.tipoVehiculo);
+  const sectionItems = { interior: INTERIOR_ITEMS, exterior: exteriorItems, mecanica: MECANICA_ITEMS };
 
   // ── edición ───────────────────────────────────────────────
   const handleScoreChange = (section: ScoreSection, item: string, value: ScoreValue) =>
@@ -738,7 +738,7 @@ function Inspecar() {
                     <MaintenanceSection
                       value={data.mantenimiento}
                       onChange={(mantenimiento) => setData((p) => ({ ...p, mantenimiento }))}
-                      onSuggest={() => suggestMantenimiento(data, interiorItems)}
+                      onSuggest={() => suggestMantenimiento(data, exteriorItems)}
                       onDownload={handleDownloadMaintenance}
                       busy={isGeneratingPdf}
                     />

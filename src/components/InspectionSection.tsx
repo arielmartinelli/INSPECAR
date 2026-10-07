@@ -157,11 +157,11 @@ export const InspectionSection: FC<InspectionSectionProps> = ({
                 idx % 2 === 0 ? 'bg-slate-50/70' : 'bg-white'
               } hover:bg-amber-50/30`}
             >
-              <div className="flex items-center gap-2">
-                <span className="text-[11px] font-mono font-bold text-slate-400 w-5 shrink-0">
+              <div className="flex items-center gap-2.5">
+                <span className="text-xs sm:text-sm font-mono font-bold text-slate-400 w-6 shrink-0">
                   {(idx + 1).toString().padStart(2, '0')}
                 </span>
-                <span className={`text-xs sm:text-sm font-bold ${isNA ? 'text-slate-400 line-through' : 'text-slate-900'}`}>
+                <span className={`text-sm sm:text-base font-bold leading-snug ${isNA ? 'text-slate-400 line-through' : 'text-slate-900'}`}>
                   {item}
                 </span>
                 {isBR && (

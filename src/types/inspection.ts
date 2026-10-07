@@ -103,18 +103,15 @@ export const INTERIOR_ITEMS = [
   'Alfombra de techo',
   'Parasoles',
   'Espejo central',
-  'Techo solar',
-  'Caja de carga',
-  'Tapa Caja de carga'
+  'Techo solar'
 ];
 
-/** Ítems que sólo aplican a pick-ups (se ocultan en sedán, hatchback y SUV). */
-export const PICKUP_ONLY_ITEMS = ['Caja de carga', 'Tapa Caja de carga'];
+/** Ítems exteriores que sólo aplican a pick-ups (se ocultan en sedán, hatchback y SUV). */
+export const PICKUP_ONLY_EXTERIOR_ITEMS = ['Caja de carga', 'Tapa caja de carga'];
 
 export const isPickupBody = (tipo: string) => /pick|caja/i.test(tipo || '');
 
-export const getInteriorItems = (tipoVehiculo: string) =>
-  isPickupBody(tipoVehiculo) ? INTERIOR_ITEMS : INTERIOR_ITEMS.filter((i) => !PICKUP_ONLY_ITEMS.includes(i));
+export const getInteriorItems = (_tipoVehiculo?: string) => INTERIOR_ITEMS;
 
 /** Texto a mostrar para cada calificación (app y PDF). */
 export const SCORE_LABEL: Record<Exclude<ScoreValue, null>, string> = {
@@ -126,7 +123,7 @@ export const SCORE_LABEL: Record<Exclude<ScoreValue, null>, string> = {
   NA: 'N/A'
 };
 
-export const EXTERIOR_ITEMS = [
+export const BASE_EXTERIOR_ITEMS = [
   'Estado rueda delantera izquierda',
   'Estado rueda delantera derecha',
   'Estado rueda trasera izquierda',
@@ -145,6 +142,13 @@ export const EXTERIOR_ITEMS = [
   'Estado Lava Luneta',
   'Estado bajos del chasis'
 ];
+
+export const getExteriorItems = (tipoVehiculo: string) =>
+  isPickupBody(tipoVehiculo)
+    ? [...BASE_EXTERIOR_ITEMS, ...PICKUP_ONLY_EXTERIOR_ITEMS]
+    : BASE_EXTERIOR_ITEMS;
+
+export const EXTERIOR_ITEMS = [...BASE_EXTERIOR_ITEMS, ...PICKUP_ONLY_EXTERIOR_ITEMS];
 
 export const MECANICA_ITEMS = [
   'Motor',
@@ -223,7 +227,11 @@ export interface Mantenimiento {
  * Sugiere tareas a partir de lo calificado: Malo y R/M → corto plazo, Regular → mediano, B/R → largo.
  * Facu después ajusta el texto, el plazo y el costo.
  */
-export const suggestMantenimiento = (d: InspectionData, interiorItems: string[]): MantenimientoItem[] => {
+export const suggestMantenimiento = (
+  d: InspectionData,
+  exteriorItems: string[] = getExteriorItems(d.vehicle.tipoVehiculo),
+  interiorItems: string[] = INTERIOR_ITEMS
+): MantenimientoItem[] => {
   const out: MantenimientoItem[] = [];
   const add = (items: string[], vals: Record<string, ScoreValue>, area: string) =>
     items.forEach((item) => {
@@ -238,7 +246,7 @@ export const suggestMantenimiento = (d: InspectionData, interiorItems: string[])
         });
     });
   add(MECANICA_ITEMS, d.mecanica, 'Mecánica');
-  add(EXTERIOR_ITEMS, d.exterior, 'Exterior');
+  add(exteriorItems, d.exterior, 'Exterior');
   add(interiorItems, d.interior, 'Interior');
   return out;
 };
