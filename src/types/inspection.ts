@@ -31,11 +31,12 @@ export const normalizeMarkers = (markers: unknown): DamageMarker[] =>
 /** Secciones con observaciones propias (se juntan en la observación general del informe). */
 export type ObsSection = 'interior' | 'exterior' | 'mecanica' | 'accesorios' | 'carroceria';
 export const OBS_SECTION_LABEL: Record<ObsSection, string> = {
-  interior: 'Interior',
+  // mismo orden que los pasos de la app (así salen las observaciones en el resumen)
+  carroceria: 'Chapa y pintura',
   exterior: 'Exterior',
+  interior: 'Interior',
   mecanica: 'Mecánica',
-  accesorios: 'Accesorios',
-  carroceria: 'Chapa y pintura'
+  accesorios: 'Accesorios'
 };
 
 /** Estado de seguimiento de cada inspección. */

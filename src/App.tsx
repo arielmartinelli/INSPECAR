@@ -5,8 +5,8 @@ import {
   type YesNoValue,
   type ObsSection,
   type Estado,
-  INTERIOR_ITEMS,
-  getExteriorItems,
+  getInteriorItems,
+  EXTERIOR_ITEMS,
   MECANICA_ITEMS,
   ACCESORIOS_ITEMS,
   ESTADOS,
@@ -15,7 +15,7 @@ import {
   compileObservaciones,
   suggestMantenimiento
 } from './types/inspection';
-import { VEHICLE_BODY_TYPES } from './data/carData';
+import { bodyTypeLabel } from './data/carData';
 import { VehicleHeaderForm } from './components/VehicleHeaderForm';
 import { InspectionSection } from './components/InspectionSection';
 import { AccessoriesSection } from './components/AccessoriesSection';
@@ -57,7 +57,7 @@ const getInitialData = (): InspectionData => ({
   id: 'INSP-' + Date.now().toString(36).toUpperCase(),
   createdAt: new Date().toISOString(),
   vehicle: {
-    tipoVehiculo: 'Sedán (Con baúl)',
+    tipoVehiculo: 'Sedán',
     marca: '',
     modelo: '',
     version: '',
@@ -98,11 +98,8 @@ const normalize = (parsed: Partial<InspectionData>): InspectionData => {
     estado: parsed.estado ?? 'borrador',
     damageMarkers: normalizeMarkers(parsed.damageMarkers) // "Bollo" → "Dañado"
   };
-  if (!VEHICLE_BODY_TYPES.includes(data.vehicle.tipoVehiculo)) {
-    // nombres viejos (ej. "Coupé (2 puertas)") se mapean al actual; si no, sedán
-    const coupe = VEHICLE_BODY_TYPES.find((t) => /coup/i.test(t));
-    data.vehicle.tipoVehiculo = /coup/i.test(data.vehicle.tipoVehiculo) && coupe ? coupe : base.vehicle.tipoVehiculo;
-  }
+  // nombres viejos (ej. "Sedán (Con baúl)", "Coupé (2 puertas)") → nombre actual sin descripción
+  data.vehicle.tipoVehiculo = bodyTypeLabel(data.vehicle.tipoVehiculo);
   return data;
 };
 
@@ -208,8 +205,8 @@ function Inspecar() {
     window.scrollTo({ top: 0 });
   }, [activeTab, view]);
 
-  const exteriorItems = getExteriorItems(data.vehicle.tipoVehiculo);
-  const sectionItems = { interior: INTERIOR_ITEMS, exterior: exteriorItems, mecanica: MECANICA_ITEMS };
+  const interiorItems = getInteriorItems(data.vehicle.tipoVehiculo);
+  const sectionItems = { interior: interiorItems, exterior: EXTERIOR_ITEMS, mecanica: MECANICA_ITEMS };
 
   // ── edición ───────────────────────────────────────────────
   const handleScoreChange = (section: ScoreSection, item: string, value: ScoreValue) =>
@@ -738,7 +735,7 @@ function Inspecar() {
                     <MaintenanceSection
                       value={data.mantenimiento}
                       onChange={(mantenimiento) => setData((p) => ({ ...p, mantenimiento }))}
-                      onSuggest={() => suggestMantenimiento(data, exteriorItems)}
+                      onSuggest={() => suggestMantenimiento(data, interiorItems)}
                       onDownload={handleDownloadMaintenance}
                       busy={isGeneratingPdf}
                     />

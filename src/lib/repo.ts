@@ -196,6 +196,28 @@ const fromRow = (r: DbRow): RecordSummary => ({
 /** Para el filtro de PostgREST sólo dejamos letras, números y espacios (evita romper/inyectar la consulta). */
 const safe = (s: string) => s.replace(/[^\p{L}\p{N} ]/gu, '').trim().slice(0, 60);
 
+/** Identificador de este celular/PC, para saber desde qué dispositivo se guardó cada inspección. */
+const DEVICE_KEY = 'inspecar_device_id';
+const deviceId = (() => {
+  try {
+    let id = localStorage.getItem(DEVICE_KEY);
+    if (!id) {
+      id = crypto.randomUUID();
+      localStorage.setItem(DEVICE_KEY, id);
+    }
+    return id;
+  } catch {
+    return 'sin-id';
+  }
+})();
+
+/** La planilla que va a la nube lleva el dispositivo que la guardó (no se guarda en la copia local). */
+const withDevice = (d: InspectionData) => ({ ...toRow(d), data: { ...d, _dev: deviceId } });
+const stripDevice = (d: InspectionData & { _dev?: string }) => {
+  const { _dev, ...rest } = d;
+  return { data: rest as InspectionData, device: _dev };
+};
+
 const canUseCloud = async () => {
   if (!supabase || !navigator.onLine) return false;
   const { data } = await supabase.auth.getSession();
@@ -205,6 +227,7 @@ const canUseCloud = async () => {
 // ── API pública ──────────────────────────────────────────────
 export const repo = {
   mode: (cloudEnabled ? 'cloud' : 'local') as 'cloud' | 'local',
+  deviceId,
 
   async list(filter: ListFilter = {}): Promise<RecordSummary[]> {
     const pend = pendingIds();
@@ -241,9 +264,33 @@ export const repo = {
   async get(id: string): Promise<InspectionData | null> {
     if (await canUseCloud()) {
       const { data, error } = await supabase!.from('inspecciones').select('data').eq('id', id).maybeSingle();
-      if (!error && data) return data.data as InspectionData;
+      if (!error && data) return stripDevice(data.data as InspectionData).data;
     }
     return localEntries().find((e) => e.data.id === id)?.data ?? null;
+  },
+
+  /** Última versión en la nube de una inspección (o la más reciente de todas si no se pasa id). Sólo id y fecha. */
+  async head(id?: string): Promise<{ id: string; updatedAt: string; estado: Estado; device?: string } | null> {
+    if (!(await canUseCloud())) return null;
+    let q = supabase!.from('inspecciones').select('id,updated_at,estado,device:data->>_dev');
+    q = id ? q.eq('id', id) : q.order('updated_at', { ascending: false }).limit(1);
+    const { data, error } = await q;
+    const r = !error && (data?.[0] as { id: string; updated_at: string; estado: Estado; device: string | null } | undefined);
+    return r ? { id: r.id, updatedAt: r.updated_at, estado: r.estado, device: r.device ?? undefined } : null;
+  },
+
+  /** Inspección completa desde la nube, sin caer a la copia local. */
+  async getCloud(id: string): Promise<{ data: InspectionData; updatedAt: string } | null> {
+    if (!(await canUseCloud())) return null;
+    const { data, error } = await supabase!.from('inspecciones').select('data,updated_at').eq('id', id).maybeSingle();
+    if (error || !data) return null;
+    const clean = stripDevice(data.data as InspectionData);
+    saveLocal(clean.data);
+    return { ...clean, updatedAt: data.updated_at as string };
+  },
+
+  isPending(id: string) {
+    return pendingIds().has(id);
   },
 
   /** Guarda en el dispositivo y, si se puede, en la base. Devuelve true si quedó en la nube. */
@@ -253,7 +300,7 @@ export const repo = {
     const pend = pendingIds();
     try {
       if (!(await canUseCloud())) throw new Error('offline');
-      const { error } = await supabase!.from('inspecciones').upsert(toRow(d));
+      const { error } = await supabase!.from('inspecciones').upsert(withDevice(d));
       if (error) throw error;
       pend.delete(d.id);
       setPending(pend);
@@ -271,7 +318,13 @@ export const repo = {
     const pend = pendingIds();
     let ok = 0;
     for (const e of localEntries().filter((x) => pend.has(x.data.id))) {
-      const { error } = await supabase!.from('inspecciones').upsert(toRow(e.data));
+      // Si desde otro celular se guardó algo más nuevo, no lo pisamos con esta copia vieja
+      const { data: cur } = await supabase!.from('inspecciones').select('updated_at').eq('id', e.data.id).maybeSingle();
+      if (cur && new Date(cur.updated_at as string) > new Date(e.savedAt)) {
+        pend.delete(e.data.id);
+        continue;
+      }
+      const { error } = await supabase!.from('inspecciones').upsert(withDevice(e.data));
       if (!error) {
         pend.delete(e.data.id);
         ok++;
