@@ -5,8 +5,8 @@ import {
   type YesNoValue,
   type ObsSection,
   type Estado,
-  getInteriorItems,
-  EXTERIOR_ITEMS,
+  INTERIOR_ITEMS,
+  getExteriorItems,
   MECANICA_ITEMS,
   ACCESORIOS_ITEMS,
   ESTADOS,
@@ -49,6 +49,8 @@ import {
 import { notify, confirmAction } from './lib/dialogs';
 
 const STORAGE_KEY = 'inspecar_draft_v3';
+const DIRTY_KEY = 'inspecar_draft_dirty'; // '1' = hay cambios de este celular que todavía no llegaron a la nube
+const TOUCH_KEY = 'inspecar_draft_touched'; // última vez que se trabajó en la planilla en este celular
 
 type TabId = 'vehiculo' | 'interior' | 'exterior' | 'mecanica' | 'accesorios' | 'carroceria' | 'resumen';
 type ScoreSection = 'interior' | 'exterior' | 'mecanica';
@@ -130,12 +132,13 @@ const canShareFiles = () => {
 };
 
 const TABS: { id: TabId; label: string; icon: typeof Car }[] = [
+  // Orden en que Facu hace el peritaje: chapa → exterior → interior → mecánica
   { id: 'vehiculo', label: 'Vehículo', icon: Car },
-  { id: 'interior', label: 'Interior', icon: Armchair },
+  { id: 'carroceria', label: 'Chapa', icon: Sparkles },
   { id: 'exterior', label: 'Exterior', icon: Car },
+  { id: 'interior', label: 'Interior', icon: Armchair },
   { id: 'mecanica', label: 'Mecánica', icon: Wrench },
   { id: 'accesorios', label: 'Accesorios', icon: ClipboardCheck },
-  { id: 'carroceria', label: 'Chapa', icon: Sparkles },
   { id: 'resumen', label: 'Resumen', icon: FileText }
 ];
 
@@ -164,11 +167,29 @@ function Inspecar() {
 
   useEffect(() => applyTheme(theme), [theme]);
 
+  // ── Sincronización entre dispositivos ──────────────────────
+  // syncedRef = la última versión que coincide con la nube. Si la planilla es igual, no hay cambios
+  // propios para subir: así abrir la app en otro celular NO pisa la nube con una copia vieja.
+  const syncedRef = useRef<string>(localStorage.getItem(DIRTY_KEY) === '1' ? '' : JSON.stringify(data));
+  const isDirty = () => JSON.stringify(dataRef.current) !== syncedRef.current;
+  const markTouched = () => localStorage.setItem(TOUCH_KEY, new Date().toISOString());
+
+  /** Carga una planilla que viene de la nube (o una nueva) sin tomarla como cambio propio. */
+  const loadSynced = useCallback((d: InspectionData) => {
+    const n = normalize(d);
+    syncedRef.current = JSON.stringify(n);
+    dataRef.current = n;
+    setData(n);
+  }, []);
+
   // Borrador local inmediato (debounce corto)
   useEffect(() => {
     const t = setTimeout(() => {
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+        const dirty = JSON.stringify(data) !== syncedRef.current;
+        if (dirty && localStorage.getItem(DIRTY_KEY) !== '1') markTouched();
+        localStorage.setItem(DIRTY_KEY, dirty ? '1' : '0');
       } catch (e) {
         console.error(e);
       }
@@ -178,14 +199,79 @@ function Inspecar() {
 
   // Guardado en registros / base de datos (debounce más largo para no escribir en cada tecla)
   useEffect(() => {
-    if (!hasContent(data)) return;
+    const json = JSON.stringify(data);
+    if (!hasContent(data) || json === syncedRef.current) return;
     const t = setTimeout(async () => {
       if (cloudEnabled) setSync('saving');
       const ok = await repo.save(data);
+      if (ok || !cloudEnabled) {
+        syncedRef.current = json;
+        if (JSON.stringify(dataRef.current) === json) localStorage.setItem(DIRTY_KEY, '0');
+      }
       if (cloudEnabled) setSync(ok ? 'saved' : 'pending');
     }, 1500);
     return () => clearTimeout(t);
   }, [data]);
+
+  // Traer de la nube lo que se cargó en el otro celular. Se hace al abrir la app, al volver a ella
+  // y cada 20 s mientras está en pantalla. Nunca reemplaza cambios propios sin subir.
+  const pulling = useRef(false);
+  const pullFromCloud = useCallback(async () => {
+    if (!cloudEnabled || pulling.current || document.visibilityState !== 'visible') return;
+    const current = dataRef.current;
+    if (isDirty() || repo.isPending(current.id)) return;
+    pulling.current = true;
+    try {
+      // 1) Si en otro celular se trabajó en otra inspección después de lo último hecho acá, abrir esa
+      const latest = await repo.head();
+      const touched = localStorage.getItem(TOUCH_KEY);
+      let targetId = current.id;
+      // (sólo si sigue en curso —borrador— y es de las últimas 12 h; las ya entregadas no se abren solas)
+      const latestTime = latest ? new Date(latest.updatedAt).getTime() : 0;
+      if (
+        latest &&
+        latest.id !== current.id &&
+        latest.device !== repo.deviceId &&
+        latest.estado === 'borrador' &&
+        Date.now() - latestTime < 12 * 3600_000 &&
+        latestTime > (touched ? new Date(touched).getTime() : 0)
+      )
+        targetId = latest.id;
+      // 2) Si es la misma, traer la versión de la nube si cambió
+      const remote = await repo.getCloud(targetId);
+      if (!remote || isDirty() || dataRef.current.id !== current.id) return;
+      if (targetId !== current.id || JSON.stringify(normalize(remote.data)) !== JSON.stringify(dataRef.current)) {
+        loadSynced(remote.data);
+        if (targetId !== current.id) {
+          markTouched();
+          setActiveTab('vehiculo');
+        }
+        setRefreshKey((k) => k + 1);
+      }
+    } catch (e) {
+      console.warn('No se pudo traer de la nube', e);
+    } finally {
+      pulling.current = false;
+    }
+    // isDirty lee refs: no hace falta como dependencia
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadSynced]);
+
+  useEffect(() => {
+    if (!cloudEnabled) return;
+    pullFromCloud();
+    const onVisible = () => document.visibilityState === 'visible' && pullFromCloud();
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', pullFromCloud);
+    window.addEventListener('online', pullFromCloud);
+    const iv = setInterval(pullFromCloud, 20_000);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', pullFromCloud);
+      window.removeEventListener('online', pullFromCloud);
+      clearInterval(iv);
+    };
+  }, [pullFromCloud]);
 
   // Al volver la señal, subir lo pendiente
   useEffect(() => {
@@ -205,8 +291,8 @@ function Inspecar() {
     window.scrollTo({ top: 0 });
   }, [activeTab, view]);
 
-  const interiorItems = getInteriorItems(data.vehicle.tipoVehiculo);
-  const sectionItems = { interior: interiorItems, exterior: EXTERIOR_ITEMS, mecanica: MECANICA_ITEMS };
+  const exteriorItems = getExteriorItems(data.vehicle.tipoVehiculo);
+  const sectionItems = { interior: INTERIOR_ITEMS, exterior: exteriorItems, mecanica: MECANICA_ITEMS };
 
   // ── edición ───────────────────────────────────────────────
   const handleScoreChange = (section: ScoreSection, item: string, value: ScoreValue) =>
@@ -274,10 +360,12 @@ function Inspecar() {
       notify('No se encontró la inspección. Puede que se haya borrado desde otro dispositivo.');
       return;
     }
-    setData(normalize(d));
+    loadSynced(d);
+    markTouched();
     setActiveTab('vehiculo');
     setView('inspeccion');
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loadSynced]);
 
   const downloadRecord = async (id: string) => {
     const d = await repo.get(id);
@@ -288,7 +376,8 @@ function Inspecar() {
     const msg = hasContent(data) ? '¿Empezar una nueva inspección? La actual queda guardada en Registros.' : '¿Empezar una nueva inspección?';
     if (!(await confirmAction({ title: 'Nueva inspección', text: msg, confirmText: 'Empezar nueva' }))) return;
     if (hasContent(data)) await repo.save(data);
-    setData(getInitialData());
+    loadSynced(getInitialData());
+    markTouched();
     setActiveTab('vehiculo');
     setView('inspeccion');
     setRefreshKey((k) => k + 1);
@@ -312,7 +401,8 @@ function Inspecar() {
     } catch {
       notify('Se limpió la ficha, pero no se pudo borrar el registro de la nube. Borralo desde Registros cuando tengas señal.', 'warning');
     }
-    setData(getInitialData());
+    loadSynced(getInitialData());
+    markTouched();
     setActiveTab('vehiculo');
     setRefreshKey((k) => k + 1);
   };
@@ -542,7 +632,7 @@ function Inspecar() {
               onOpen={openRecord}
               onDownload={downloadRecord}
               onDeleted={(id) => {
-                if (id === data.id) setData(getInitialData());
+                if (id === data.id) loadSynced(getInitialData());
               }}
             />
           ) : (
@@ -735,7 +825,7 @@ function Inspecar() {
                     <MaintenanceSection
                       value={data.mantenimiento}
                       onChange={(mantenimiento) => setData((p) => ({ ...p, mantenimiento }))}
-                      onSuggest={() => suggestMantenimiento(data, interiorItems)}
+                      onSuggest={() => suggestMantenimiento(data, exteriorItems)}
                       onDownload={handleDownloadMaintenance}
                       busy={isGeneratingPdf}
                     />
