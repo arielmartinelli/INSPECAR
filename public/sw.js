@@ -7,7 +7,7 @@
  *
  * Si cambiás algo de este archivo, subí la versión para forzar la limpieza de cachés viejas.
  */
-const VERSION = 'inspecar-v3';
+const VERSION = 'inspecar-v4';
 // ignoreVary: el servidor responde con "Vary: Origin" y los <script type=module> mandan Origin,
 // así que sin esto la copia guardada nunca coincidía y la app quedaba en blanco offline.
 const SHELL = `${VERSION}-shell`;
